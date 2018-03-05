@@ -35,7 +35,7 @@ file_cap = pyshark.FileCapture('captures/latest/attack1_small.pcapng')
 
 
 get_ipython().run_line_magic('time', '')
-# These are the usual ipython objects
+# These are the usual ipython objects which we may want to exclude from memory leak analysis
 ipython_vars = ['In', 'Out', 'exit', 'quit', 'get_ipython', 'ipython_vars']
 
 # Filter data from the captured packets for further processing
