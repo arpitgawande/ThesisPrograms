@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[216]:
+# In[19]:
 
 
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -21,7 +21,78 @@ import csv
 import matplotlib.pyplot as plt
 
 
-# In[217]:
+# In[20]:
+
+
+# Calculating Eigenvectors and eigenvalues of Cov matirx
+def PCA_component_analysis(X_std):
+    mean_vec = np.mean(X_std, axis=0)
+    cov_mat = np.cov(X_std.T)
+    eig_vals, eig_vecs = np.linalg.eig(cov_mat)
+
+    # Create a list of (eigenvalue, eigenvector) tuples
+    eig_pairs = [ (np.abs(eig_vals[i]),eig_vecs[:,i]) for i in range(len(eig_vals))]
+
+    # # Sort from high to low
+    eig_pairs.sort(key = lambda x: x[0], reverse= True)
+
+    # Calculation of Explained Variance from the eigenvalues
+    tot = sum(eig_vals)
+    var_exp = [(i/tot)*100 for i in sorted(eig_vals, reverse=True)] # Individual explained variance
+    cum_var_exp = np.cumsum(var_exp) # Cumulative explained variance
+
+    # PLOT OUT THE EXPLAINED VARIANCES SUPERIMPOSED 
+    plt.figure(figsize=(10, 5))
+    plt.bar(range(9), var_exp, alpha=0.3333, align='center', label='individual explained variance', color = 'g')
+    plt.step(range(9), cum_var_exp, where='mid',label='cumulative explained variance')
+    plt.ylabel('Explained variance ratio')
+    plt.xlabel('Principal components')
+    plt.legend(loc='best')
+    plt.show()
+
+
+# In[21]:
+
+
+from sklearn.decomposition import PCA
+def plot_clusters(X, X_clusters, centroids, kmeans):
+    #Use PCA component analysis for visuals
+    if X.shape[1] > 2:
+        reduced_X = PCA(n_components=2).fit_transform(X)
+    else:
+        reduced_X = X
+   
+    # Step size of the mesh. Decrease to increase the quality of the VQ.
+    h = .01     # point in the mesh [x_min, x_max]x[y_min, y_max].
+
+    # Plot the decision boundary. For that, we will assign a color to each
+    x_min, x_max = reduced_X[:, 0].min() - 1, reduced_X[:, 0].max() + 1
+    y_min, y_max = reduced_X[:, 1].min() - 1, reduced_X[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+
+    # Obtain labels for each point in mesh. Use last trained model.
+    Z = kmeans.predict(np.c_[xx.ravel(), yy.ravel()])
+
+    # Put the result into a color plot
+    Z = Z.reshape(xx.shape)
+    plt.figure(1)
+    plt.clf()
+    plt.imshow(Z, interpolation='nearest',
+               extent=(xx.min(), xx.max(), yy.min(), yy.max()),
+               cmap=plt.cm.Paired,
+               aspect='auto', origin='lower')   
+    #Plot the data points (PCA reduced components)
+    plt.plot(reduced_X[:,0],reduced_X[:,1],  'k.', markersize=3t) 
+    plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=169, linewidths=3, color='w', zorder=10)
+    plt.title('K-means clustering with (PCA-reduced data), Centroids are marked with white cross')
+    plt.xlim(x_min, x_max)
+    plt.ylim(y_min, y_max)
+    plt.xticks(())
+    plt.yticks(())
+    plt.show()
+
+
+# In[22]:
 
 
 from scipy.spatial.distance import euclidean
@@ -35,28 +106,121 @@ def k_mean_dist(data, clusters, cluster_centers):
     return distances
 
 
-# In[218]:
+# In[30]:
 
 
-#Folder Base Path
-base_path = 'converted/test2/'
+from sklearn.cluster import KMeans
+def determine_cluster_count(X_trans):
+    Nc = range(1, 10)
+    kmeans = [KMeans(n_clusters=i) for i in Nc]
+    kmeans
+    score = [kmeans[i].fit(X_trans).score(X_trans) for i in range(len(kmeans))]
+    score
+    plt.plot(Nc,score)
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('Score')
+    plt.title('Elbow Curve')
+    plt.show()
 
 
-# In[220]:
+# In[152]:
 
 
-#Cluster Path
+import glob
+#Merge sample files to create bigger sameple
+def merge_sample_files(sample_folder, file_count):
+    file_number = 1
+    count = 0
+    filenames = sorted(glob.glob(os.path.join(sample_folder,'*')),  key=os.path.getmtime)
+    for filename in filenames:
+        if count == 0:
+            df = pd.read_csv(filename, index_col=0)
+            count += 1
+        else:
+            temp_df = pd.read_csv(filename, index_col=0)
+            df = df.append(temp_df)
+            count += 1
+        if count == file_count:
+            df.to_csv(os.path.join(sample_folder,'m'+str(file_number)))
+            df = df.drop(df.index, inplace=True)
+            count = 0
+            file_number +=1
+
+
+# In[178]:
+
+
+def get_cluster_feature_vector_dict(cluster_folder):
+    cluster_dict = dict()
+    filenames = sorted(glob.glob(os.path.join(cluster_folder,'*')),  key=os.path.getmtime)
+    first = True
+    for filename in filenames:
+        if first:
+            df = pd.read_csv(filename, index_col=0)
+            first = False
+        else:
+            temp_df = pd.read_csv(filename, index_col=0)
+            df = df.append(temp_df) 
+    df = df.reset_index().set_index(['cluster','ip'])
+    cluster = df.index.get_level_values(0).unique()
+    for c in clusters:
+        cluster_dict[c] = df.loc[c].iloc[:,:-1].values
+    return cluster_dict
+
+
+# In[187]:
+
+
+#SKlearn SVM
+from sklearn import svm
+def one_class_svm_for_clusters(cluster_feature_dict):
+    svm_dict = dict()
+    for key, value in cluster_feature_dict.items():
+        X_train = value
+        # fit the model
+        clf = svm.OneClassSVM(nu=0.1, kernel="rbf", gamma=0.1)
+        clf.fit(X_train)
+        #Store trained SVM for each IP
+        svm_dict[key] = clf
+    return svm_dict
+
+
+# In[159]:
+
+
+#Base Folder sPaths
+base_path = os.path.join('converted','test2')
 #Normal
-sample_path = base_path+'samples/'
-cluster_path = base_path+'ip_cluster/'
+sample_path = os.path.join(base_path,'samples')
+cluster_path = os.path.join(base_path,'ip_cluster')
 #Attack
-# sample_path = base_path+'attack_samples/1/'
-# cluster_path = base_path+'attack_ip_cluster/1/'
+# sample_path = os.path.join(base_path,'attack_samples','1')
+# cluster_path = os.path.join(base_path,'attack_ip_cluster','1')
 
-centroid_path = base_path+'centroids/'
+centroid_path = os.path.join(base_path,'centroids')
 
 
-# In[224]:
+# In[179]:
+
+
+#merge_sample_files(sample_path,3)
+d = get_cluster_feature_vector_dict(cluster_path)
+
+
+# In[189]:
+
+
+svm_dict = one_class_svm_for_clusters(d)
+
+
+# In[ ]:
+
+
+#Predict for the give destination if it is normal or not
+svm_dict['192.168.0.7'].predict([[0,0,1,1]])
+
+
+# In[32]:
 
 
 first = True
@@ -85,8 +249,10 @@ for filename in os.listdir(sample_path):
     #Transform Traning data
     X_trans = scaler.transform(X)
     #print(X_trans)
+    #Determine cluster counts using elbow method
+    #determine_cluster_count(X_trans)
     #Define Number of Clusters
-    cluster_count = 6
+    cluster_count = 3
     #Data Fitting using K-means
     #if first:
     kmeans = KMeans(n_clusters=cluster_count)
@@ -101,7 +267,7 @@ for filename in os.listdir(sample_path):
     first = False
 
 
-# In[225]:
+# In[33]:
 
 
 #Calculate Centroid Mean
@@ -116,11 +282,13 @@ for df in centroid_dfs:
     centroids.append(centroid)
     features |= set(df.columns)
 #Save centroid for future clusterinng
+if not os.path.exists(centroid_path):
+    os.makedirs(centroid_path)
 np.savetxt(centroid_path+"centroids.csv", np.asarray(centroids), delimiter=",")
 np.savetxt(centroid_path+"features.csv", np.asarray(list(features)), delimiter=",")
 
 
-# In[228]:
+# In[44]:
 
 
 #Actual Clustering
@@ -155,7 +323,8 @@ for filename in os.listdir(sample_path):
     #Data Fitting using K-means
     kmeans = KMeans(n_clusters=centroids.shape[0], init=centroids)
     clusters = kmeans.fit_predict(X_trans)
-    plot_clusters(X_trans, clusters, centroids, kmeans)
+    #Plot clusters and data using PCA component analysis
+    #plot_clusters(X_trans, clusters, centroids, kmeans)
     distances = k_mean_dist(X_trans, clusters, centroids)
     #Attaching label/cluster to IP
     cluster_df = pd.DataFrame({'cluster': kmeans.labels_})
@@ -168,75 +337,7 @@ for filename in os.listdir(sample_path):
     sample_count += 1
 
 
-# In[204]:
-
-
-# Calculating Eigenvectors and eigenvalues of Cov matirx
-def PCA_component_analysis(X_std):
-    mean_vec = np.mean(X_std, axis=0)
-    cov_mat = np.cov(X_std.T)
-    eig_vals, eig_vecs = np.linalg.eig(cov_mat)
-
-    # Create a list of (eigenvalue, eigenvector) tuples
-    eig_pairs = [ (np.abs(eig_vals[i]),eig_vecs[:,i]) for i in range(len(eig_vals))]
-
-    # # Sort from high to low
-    eig_pairs.sort(key = lambda x: x[0], reverse= True)
-
-    # Calculation of Explained Variance from the eigenvalues
-    tot = sum(eig_vals)
-    var_exp = [(i/tot)*100 for i in sorted(eig_vals, reverse=True)] # Individual explained variance
-    cum_var_exp = np.cumsum(var_exp) # Cumulative explained variance
-
-    # PLOT OUT THE EXPLAINED VARIANCES SUPERIMPOSED 
-    plt.figure(figsize=(10, 5))
-    plt.bar(range(9), var_exp, alpha=0.3333, align='center', label='individual explained variance', color = 'g')
-    plt.step(range(9), cum_var_exp, where='mid',label='cumulative explained variance')
-    plt.ylabel('Explained variance ratio')
-    plt.xlabel('Principal components')
-    plt.legend(loc='best')
-    plt.show()
-
-
-# In[227]:
-
-
-from sklearn.decomposition import PCA
-def plot_clusters(X, X_clusters, centroids, kmeans):
-    #Use PCA component analysis for visuals
-    reduced_X = PCA(n_components=2).fit_transform(X)
-   
-    # Step size of the mesh. Decrease to increase the quality of the VQ.
-    h = .02     # point in the mesh [x_min, x_max]x[y_min, y_max].
-
-    # Plot the decision boundary. For that, we will assign a color to each
-    x_min, x_max = reduced_X[:, 0].min() - 1, reduced_X[:, 0].max() + 1
-    y_min, y_max = reduced_X[:, 1].min() - 1, reduced_X[:, 1].max() + 1
-    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
-
-    # Obtain labels for each point in mesh. Use last trained model.
-    Z = kmeans.predict(np.c_[xx.ravel(), yy.ravel()])
-
-    # Put the result into a color plot
-    Z = Z.reshape(xx.shape)
-    plt.figure(1)
-    plt.clf()
-    plt.imshow(Z, interpolation='nearest',
-               extent=(xx.min(), xx.max(), yy.min(), yy.max()),
-               cmap=plt.cm.Paired,
-               aspect='auto', origin='lower')   
-    #Plot the data points (PCA reduced components)
-    plt.plot(reduced_X[:,0],reduced_X[:,1],  'k.', markersize=2) 
-    plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=169, linewidths=3, color='w', zorder=10)
-    plt.title('K-means clustering with (PCA-reduced data), Centroids are marked with white cross')
-    plt.xlim(x_min, x_max)
-    plt.ylim(y_min, y_max)
-    plt.xticks(())
-    plt.yticks(())
-    plt.show()
-
-
-# In[199]:
+# In[45]:
 
 
 from itertools import groupby
@@ -253,7 +354,7 @@ for filename in os.listdir(cluster_path):
                 ip_dict[row['ip']] = [row['cluster']]
 
 
-# In[200]:
+# In[46]:
 
 
 ip_cluster_dict = dict()
@@ -262,7 +363,7 @@ for key, value in ip_dict.items():
     ip_cluster_dict[key] = {k: len(list(group)) for k, group in groupby(value)}
 
 
-# In[201]:
+# In[47]:
 
 
 ip_cluster_dict

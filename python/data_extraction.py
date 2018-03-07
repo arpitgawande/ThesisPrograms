@@ -28,10 +28,10 @@ required_keys = ['ip.dst', 'ip.proto', 'tcp.flags.syn', 'tcp.flags.ack']
 
 
 # Reading packets from pre-captured file
-file_cap = pyshark.FileCapture('captures/latest/attack1_small.pcapng')
+file_cap = pyshark.FileCapture('captures/botnet-capture-20110810-neris.pcap')
 
 
-# In[4]:
+# In[ ]:
 
 
 get_ipython().run_line_magic('time', '')
@@ -48,7 +48,7 @@ endTime = 0.0
 i = -1
 first = True
 #Write extraction result to 
-base_directory = 'converted/test2/attack_samples/1/'
+base_directory = 'converted/test3/attack_samples/1/'
 #Sample Number
 init_sample = 1
 dfList = []
