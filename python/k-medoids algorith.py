@@ -3,7 +3,6 @@
 
 # In[4]:
 
-
 from sklearn.metrics.pairwise import pairwise_distances
 import numpy as np
 
@@ -29,4 +28,9 @@ print('clustering result:')
 for label in C:
     for point_idx in C[label]:
         print('label {0}:　{1}'.format(label, data[point_idx]))
+
+
+# In[ ]:
+
+
 

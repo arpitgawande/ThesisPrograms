@@ -3,7 +3,6 @@
 
 # In[1]:
 
-
 # Common Imports
 
 #Pandas for creating dataframes
@@ -14,11 +13,10 @@ import pyshark
 
 # Ploting
 import matplotlib.pyplot as plt
-get_ipython().run_line_magic('matplotlib', 'inline')
+get_ipython().magic('matplotlib inline')
 
 
 # In[2]:
-
 
 def remove_dict_key(layer_keys, layer_dict):
     for key in layer_keys:
@@ -27,7 +25,6 @@ def remove_dict_key(layer_keys, layer_dict):
 
 
 # In[3]:
-
 
 def get_dict_for_keys(layer_keys, layer_dict):
     new_dict = dict()
@@ -39,7 +36,6 @@ def get_dict_for_keys(layer_keys, layer_dict):
 
 # In[4]:
 
-
 d = {x:x**2 for x in range(10)}
 ks = [1,3,5]
 {key:value for key, value in d.items() if key in ks}
@@ -47,12 +43,10 @@ ks = [1,3,5]
 
 # In[5]:
 
-
 required_keys = ['ip.dst', 'ip.proto', 'tcp.flags.syn', 'tcp.flags.ack']
 
 
 # In[6]:
-
 
 # Reading packets from pre-captured file
 file_cap = pyshark.FileCapture('captures/nov30_normal.pcapng')
@@ -60,12 +54,10 @@ file_cap = pyshark.FileCapture('captures/nov30_normal.pcapng')
 
 # In[7]:
 
-
 #!pip list
 
 
 # In[8]:
-
 
 print(file_cap[0].sniff_timestamp)
 print(type(file_cap[0].sniff_timestamp))
@@ -83,8 +75,7 @@ file_cap[0].frame_info
 
 # In[19]:
 
-
-get_ipython().run_line_magic('time', '')
+get_ipython().magic('time')
 # Converting capture file into dataframe for operations
 #List of dataframes to hold
 dfList = []
@@ -153,7 +144,6 @@ while(True):
 
 # In[13]:
 
-
 # Create big table from all packet dataframe which are per packet
 first = True
 test_set = 99
@@ -174,36 +164,30 @@ for d in dfList:
 
 # In[14]:
 
-
 tdf.head()
 
 
 # In[ ]:
-
 
 #tdf
 
 
 # In[ ]:
 
-
 (dfList[0]['test_set'].values[0] == 1)
 
 
 # In[12]:
-
 
 tdf.columns
 
 
 # In[ ]:
 
-
 #pd.to_datetime(tdf['sniff_timestamp'], unit='s').head()
 
 
 # In[ ]:
-
 
 # import datetime
 # print(datetime.datetime.fromtimestamp(float('1312966900.47579')).strftime('%Y-%m-%d %H:%M:%S'))
@@ -211,36 +195,30 @@ tdf.columns
 
 # In[ ]:
 
-
 #t = tdf[['ip.dst', 'ip.proto', 'tcp.flags.syn', 'tcp.flags.ack', 'sniff_timestamp', 'test_set']]
 
 
 # In[ ]:
-
 
 t = tdf[['ip.dst', 'ip.proto', 'sniff_timestamp', 'test_set']]
 
 
 # In[ ]:
 
-
 t = t[t['ip.dst'].notnull()]
 
 
 # In[ ]:
-
 
 #t.columns = ['ip', 'proto', 'syn', 'ack', 'time_stamp', 'test_set']
 
 
 # In[ ]:
 
-
 t.columns = ['ip', 'proto', 'time_stamp', 'test_set']
 
 
 # In[ ]:
-
 
 ip_mapping = dict()
 i = 0
@@ -251,78 +229,65 @@ for ip in t['ip'].unique():
 
 # In[ ]:
 
-
 t['ip'].unique()
 
 
 # In[ ]:
-
 
 #ip_mapping
 
 
 # In[ ]:
 
-
 mapping_df = pd.DataFrame(list(ip_mapping.values()), index=ip_mapping.keys())
 
 
 # In[ ]:
-
 
 mapping_df.columns = ['ip']
 
 
 # In[ ]:
 
-
 mapping_df.index.name = 'mapped'
 
 
 # In[ ]:
-
 
 mapping_df = mapping_df.reset_index().set_index(['ip'])
 
 
 # In[ ]:
 
-
 mapping_df.loc['test'] = 11
 
 
 # In[ ]:
-
 
 mapping_df.head()
 
 
 # In[ ]:
 
-
 mapping_df[mapping_df['mapped'] == 2]
 
 
 # In[ ]:
-
 
 #mapping_df.loc['224.0.0.22'][0]
 
 
 # In[ ]:
 
-
 t['ipmap'] = t['ip'].apply(lambda x: mapping_df.loc[x][0])
 
 
 # In[ ]:
 
-
 t.head()
 
 
 # In[ ]:
-
 
 # SYN packets is:
 #tcp.flags.syn==1 && tcp.flags.ack==0
@@ -330,42 +295,35 @@ t.head()
 
 # In[ ]:
 
-
 df = t.groupby(['ipmap', 'proto']).size().unstack().fillna(0).astype(int)
 
 
 # In[ ]:
-
 
 df.head()
 
 
 # In[ ]:
 
-
 d = pd.read_csv('converted/test_set1', index_col=0)
 
 
 # In[ ]:
-
 
 d.head()
 
 
 # In[ ]:
 
-
 df.values.shape, df.index.shape
 
 
 # In[ ]:
 
-
 #df.values
 
 
 # In[ ]:
-
 
 mapping_created = False
 df_list = []
@@ -405,7 +363,6 @@ for test_set in range(1,18,1):
 
 # In[ ]:
 
-
 df_con = pd.concat(df_list)
 df_con.to_csv('converted/test_mat')
 mapping_df.to_csv('converted/mapping')
@@ -413,18 +370,15 @@ mapping_df.to_csv('converted/mapping')
 
 # In[ ]:
 
-
 m = pd.read_csv('converted/test_mat', index_col=0)
 
 
 # In[ ]:
 
-
 m.head()
 
 
 # In[ ]:
-
 
 m.plot(x='6.0', y='17.0',kind='hexbin')
 #Plot shows that they are not related
@@ -432,32 +386,27 @@ m.plot(x='6.0', y='17.0',kind='hexbin')
 
 # In[ ]:
 
-
 plt.pcolor(m.astype(float).corr())
 
 
 # In[ ]:
-
 
 #m.values, m.index.values
 
 
 # In[ ]:
 
-
 X = m.values; y = m.index.values
 
 
 # In[ ]:
-
 
 X.shape, y.shape
 
 
 # In[ ]:
 
-
-get_ipython().run_line_magic('matplotlib', 'inline')
+get_ipython().magic('matplotlib inline')
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 Nc = range(1, 20)
@@ -474,13 +423,11 @@ plt.show()
 
 # In[ ]:
 
-
 from sklearn.cross_validation import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.3)
 
 
 # In[ ]:
-
 
 #Preprocessing the data
 from sklearn import preprocessing
@@ -495,14 +442,12 @@ X_trans = scaler.transform(X_train)
 
 # In[ ]:
 
-
 # from sklearn.neural_network import MLPClassifier
 # clf = MLPClassifier(solver='lbfgs', alpha=1e-5,hidden_layer_sizes=(5, 2), random_state=1)
 # clf.fit(X, y)
 
 
 # In[ ]:
-
 
 # from sklearn.naive_bayes import 
 # clf = BernoulliNB()
@@ -511,14 +456,12 @@ X_trans = scaler.transform(X_train)
 
 # In[ ]:
 
-
 # from sklearn.svm import LinearSVC
 # lsvc = LinearSVC()
 # lsvc.fit(X_train, y_train) 
 
 
 # In[ ]:
-
 
 from sklearn.cluster import KMeans
 kmeans = KMeans(n_clusters=3)
@@ -527,19 +470,16 @@ kmeans.fit(X_trans)
 
 # In[ ]:
 
-
 print(kmeans.labels_)
 print(kmeans.cluster_centers_)
 
 
 # In[ ]:
 
-
 X_pred = kmeans.predict(X)
 
 
 # In[ ]:
-
 
 from sklearn.decomposition import PCA
 pca = PCA(n_components=3).fit(X)
@@ -548,7 +488,6 @@ pca_d = pca.transform(X)
 
 
 # In[ ]:
-
 
 # Set a 3 KMeans clustering
 #kmeans = KMeans(n_clusters=3)
@@ -567,42 +506,35 @@ plt.show()
 
 # In[ ]:
 
-
 X_test_trans = scaler.transform(X_test)
 
 
 # In[ ]:
-
 
 clf.score(X_test_trans, y_test)
 
 
 # In[ ]:
 
-
 lsvc.score(X_test_trans, y_test)
 
 
 # In[ ]:
-
 
 clf.predict([[0,0,0,0]])
 
 
 # In[ ]:
 
-
 df.loc[23]
 
 
 # In[ ]:
 
-
 wireshark_attr_lst_recreated = np.genfromtxt('wireshark_attr_lst.csv', delimiter=',', dtype=str)
 
 
 # In[ ]:
-
 
 layr = dict()
 l = wireshark_attr_lst_recreated.tolist()
@@ -616,18 +548,15 @@ for a in wireshark_attr_lst_recreated:
 
 # In[ ]:
 
-
 layr['http']
 
 
 # In[ ]:
 
-
 tdf[tdf['tcp.flags.syn'].notnull()][['tcp.flags.syn']]
 
 
 # In[ ]:
-
 
 t = tdf
 #t['ip.dst'] = t['ip.dst'].astype("category")
@@ -637,7 +566,6 @@ t = t[(t[dst].notnull()) & (t[dst] == infected)]
 
 
 # In[ ]:
-
 
 #Get values of other attributes when destination has address
 lst = ['dns.a',
@@ -664,7 +592,6 @@ lst = ['dns.a',
 
 
 # In[ ]:
-
 
 #Read HTML tables
 htmldata = pd.read_html('https://en.wikipedia.org/wiki/List_of_IP_protocol_numbers')

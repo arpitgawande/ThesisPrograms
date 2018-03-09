@@ -3,7 +3,6 @@
 
 # In[2]:
 
-
 # Common Imports
 
 #Pandas for creating dataframes
@@ -11,7 +10,6 @@ import pandas as pd
 
 
 # In[6]:
-
 
 tdf = pd.read_csv('converted/s1', index_col=0)
 #Filter Columns
@@ -26,18 +24,15 @@ df = t.groupby(['ip', 'proto']).size().unstack().fillna(0).astype(int)
 
 # In[87]:
 
-
 #df
 
 
 # In[12]:
 
-
 X = df.values
 
 
 # In[14]:
-
 
 #Preprocessing the data (Feature Scaling)
 from sklearn import preprocessing
@@ -52,14 +47,12 @@ X_trans = scaler.transform(X)
 
 # In[21]:
 
-
 X_trans.shape
 
 
 # In[15]:
 
-
-get_ipython().run_line_magic('matplotlib', 'inline')
+get_ipython().magic('matplotlib inline')
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 Nc = range(1, 20)
@@ -76,13 +69,11 @@ plt.show()
 
 # In[56]:
 
-
 #Define Number of Clusters
 cluster_count = 6
 
 
 # In[57]:
-
 
 from sklearn.cluster import KMeans
 kmeans = KMeans(n_clusters=cluster_count)
@@ -91,49 +82,41 @@ kmeans.fit(X_trans)
 
 # In[58]:
 
-
 print(kmeans.labels_)
 print(kmeans.cluster_centers_)
 
 
 # In[81]:
 
-
 ip_series = pd.Series(df.index, name='ip')
 
 
 # In[82]:
-
 
 label_series = pd.Series(kmeans.labels_, name='label')
 
 
 # In[86]:
 
-
 ip_label_df = pd.concat([ip_series, label_series], axis=1).set_index('ip')
 
 
 # In[ ]:
-
 
 ip_label_df.csv('converted/ip_label')
 
 
 # In[70]:
 
-
 X_pred = kmeans.predict([X[0]])
 
 
 # In[71]:
 
-
 X_pred
 
 
 # In[60]:
-
 
 from sklearn.decomposition import PCA
 pca = PCA(n_components=3).fit(X)
@@ -142,7 +125,6 @@ pca_d = pca.transform(X)
 
 
 # In[64]:
-
 
 from matplotlib import colors
 #Get colors
@@ -156,4 +138,9 @@ label_color = [LABEL_COLOR_MAP[l] for l in X_pred]
 plt.figure(figsize = (7,7))
 plt.scatter(pca_d[:,0],pca_d[:,1], c= label_color, alpha=0.5) 
 plt.show()
+
+
+# In[ ]:
+
+
 

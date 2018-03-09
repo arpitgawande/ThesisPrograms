@@ -3,7 +3,6 @@
 
 # In[1]:
 
-
 # Common Imports
 #Pandas for creating dataframes
 import pandas as pd
@@ -19,13 +18,11 @@ from sklearn import svm
 
 # In[2]:
 
-
 #Folder Base Path
 base_path = 'converted/test2/'
 
 
 # In[3]:
-
 
 first = True
 
@@ -53,7 +50,6 @@ for filename in os.listdir(sample_path):
 
 # In[5]:
 
-
 #cobine all dataframes and sort by IP address
 df1 = pd.concat(dfList).sort_index()
 #drop old index and create new multi-index with IP address and sample so that all the sample data for a given IP is cobined.
@@ -62,12 +58,10 @@ df1 = df1.reset_index().set_index(['ip','sample'])
 
 # In[7]:
 
-
 df1.head()
 
 
 # In[9]:
-
 
 #Get list of all IP address
 indexValues = df1.index.get_level_values(0)
@@ -75,12 +69,10 @@ indexValues = df1.index.get_level_values(0)
 
 # In[11]:
 
-
 indexValues
 
 
 # In[80]:
-
 
 #Train SVM for each IP address data
 svm_dict = dict()
@@ -94,7 +86,6 @@ for i in indexValues:
 
 
 # In[90]:
-
 
 #Predict for the give destination if it is normal or not
 svm_dict['192.168.0.7'].predict([[0,0,1,1]])

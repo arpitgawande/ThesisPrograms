@@ -3,7 +3,6 @@
 
 # In[1]:
 
-
 # Common Imports
 
 #Pandas for creating dataframes
@@ -19,13 +18,11 @@ import sys
 
 # In[2]:
 
-
 #Define required attributed needed to extract from capture.
 required_keys = ['ip.dst', 'ip.proto', 'tcp.flags.syn', 'tcp.flags.ack']
 
 
 # In[3]:
-
 
 # Reading packets from pre-captured file
 file_cap = pyshark.FileCapture('captures/botnet-capture-20110810-neris.pcap')
@@ -33,8 +30,7 @@ file_cap = pyshark.FileCapture('captures/botnet-capture-20110810-neris.pcap')
 
 # In[ ]:
 
-
-get_ipython().run_line_magic('time', '')
+get_ipython().magic('time')
 # These are the usual ipython objects which we may want to exclude from memory leak analysis
 ipython_vars = ['In', 'Out', 'exit', 'quit', 'get_ipython', 'ipython_vars']
 
@@ -108,4 +104,9 @@ while(True):
 #If sample data is not written to file because for frame size
 if(sample == init_sample):
     dfList.to_csv(base_directory+str(init_sample))
+
+
+# In[ ]:
+
+
 

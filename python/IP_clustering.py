@@ -1,10 +1,9 @@
 
 # coding: utf-8
 
-# In[19]:
+# In[1]:
 
-
-get_ipython().run_line_magic('matplotlib', 'inline')
+get_ipython().magic('matplotlib inline')
 # Common Imports
 import numpy as np
 #Pandas for creating dataframes
@@ -21,8 +20,7 @@ import csv
 import matplotlib.pyplot as plt
 
 
-# In[20]:
-
+# In[2]:
 
 # Calculating Eigenvectors and eigenvalues of Cov matirx
 def PCA_component_analysis(X_std):
@@ -51,8 +49,7 @@ def PCA_component_analysis(X_std):
     plt.show()
 
 
-# In[21]:
-
+# In[5]:
 
 from sklearn.decomposition import PCA
 def plot_clusters(X, X_clusters, centroids, kmeans):
@@ -82,7 +79,7 @@ def plot_clusters(X, X_clusters, centroids, kmeans):
                cmap=plt.cm.Paired,
                aspect='auto', origin='lower')   
     #Plot the data points (PCA reduced components)
-    plt.plot(reduced_X[:,0],reduced_X[:,1],  'k.', markersize=3t) 
+    plt.plot(reduced_X[:,0],reduced_X[:,1],  'k.', markersize=3) 
     plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=169, linewidths=3, color='w', zorder=10)
     plt.title('K-means clustering with (PCA-reduced data), Centroids are marked with white cross')
     plt.xlim(x_min, x_max)
@@ -92,8 +89,7 @@ def plot_clusters(X, X_clusters, centroids, kmeans):
     plt.show()
 
 
-# In[22]:
-
+# In[6]:
 
 from scipy.spatial.distance import euclidean
 def k_mean_dist(data, clusters, cluster_centers):
@@ -106,8 +102,7 @@ def k_mean_dist(data, clusters, cluster_centers):
     return distances
 
 
-# In[30]:
-
+# In[7]:
 
 from sklearn.cluster import KMeans
 def determine_cluster_count(X_trans):
@@ -123,8 +118,7 @@ def determine_cluster_count(X_trans):
     plt.show()
 
 
-# In[152]:
-
+# In[8]:
 
 import glob
 #Merge sample files to create bigger sameple
@@ -147,8 +141,7 @@ def merge_sample_files(sample_folder, file_count):
             file_number +=1
 
 
-# In[178]:
-
+# In[13]:
 
 def get_cluster_feature_vector_dict(cluster_folder):
     cluster_dict = dict()
@@ -162,31 +155,74 @@ def get_cluster_feature_vector_dict(cluster_folder):
             temp_df = pd.read_csv(filename, index_col=0)
             df = df.append(temp_df) 
     df = df.reset_index().set_index(['cluster','ip'])
-    cluster = df.index.get_level_values(0).unique()
+    clusters = df.index.get_level_values(0).unique()
     for c in clusters:
         cluster_dict[c] = df.loc[c].iloc[:,:-1].values
     return cluster_dict
 
 
-# In[187]:
+# In[72]:
 
+def plot_outlier_detecton(X_train, clf):
+    
+    xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
+    
+    # plot the levels lines and the points
+    print(clf.name)
+    if clf.name == "lof":
+        # decision_function is private for LOF
+        Z = clf._decision_function(np.c_[xx.ravel(), yy.ravel()])
+    else:
+        Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+    print(Z.max(), Z.min())
+    plt.title("Novelty Detection")
+    plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
+    a = plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
+    #plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
+    
+    s = 40
+    b1 = plt.scatter(X_train[:, 0], X_train[:, 1], c='white', s=s, edgecolors='k')
+    plt.axis('tight')
+    plt.xlim((-5, 5))
+    plt.ylim((-5, 5))
+    plt.legend([a.collections[0], b1],
+           ["learned frontier", "training observations"],
+           loc="upper left")
+    plt.show()
+
+
+# In[73]:
 
 #SKlearn SVM
 from sklearn import svm
+from sklearn.neighbors import LocalOutlierFactor
 def one_class_svm_for_clusters(cluster_feature_dict):
     svm_dict = dict()
+    scalar_dict = dict()
     for key, value in cluster_feature_dict.items():
         X_train = value
+        #Get scaler
+        scaler = preprocessing.StandardScaler().fit(X_train)
+        scalar_dict[key] = scaler 
+        #Transform Traning data
+        X_trans = scaler.transform(X_train)
         # fit the model
         clf = svm.OneClassSVM(nu=0.1, kernel="rbf", gamma=0.1)
-        clf.fit(X_train)
+        clf.fit(X_trans)
+        clf.name = 'svm'
+        plot_outlier_detecton(X_trans, clf)
+        
+        clf = LocalOutlierFactor(contamination=0.01)
+        clf.fit(X_trans)
+        clf.name= 'lof'
+        plot_outlier_detecton(X_trans, clf)
         #Store trained SVM for each IP
         svm_dict[key] = clf
-    return svm_dict
+    return svm_dict, scalar_dict
 
 
-# In[159]:
-
+# In[15]:
 
 #Base Folder sPaths
 base_path = os.path.join('converted','test2')
@@ -200,28 +236,31 @@ cluster_path = os.path.join(base_path,'ip_cluster')
 centroid_path = os.path.join(base_path,'centroids')
 
 
-# In[179]:
-
+# In[59]:
 
 #merge_sample_files(sample_path,3)
 d = get_cluster_feature_vector_dict(cluster_path)
 
 
-# In[189]:
+# In[77]:
+
+#svm_dict, scaler_dict = one_class_svm_for_clusters(d)
 
 
-svm_dict = one_class_svm_for_clusters(d)
+# In[27]:
+
+svm_dict
 
 
-# In[ ]:
-
+# In[50]:
 
 #Predict for the give destination if it is normal or not
-svm_dict['192.168.0.7'].predict([[0,0,1,1]])
+X_test = [[0,120]]
+X_test_tran = scaler_dict[0].transform(X_test)
+svm_dict[0].predict(X_test_tran)
 
 
 # In[32]:
-
 
 first = True
 ip_dict = dict()
@@ -269,7 +308,6 @@ for filename in os.listdir(sample_path):
 
 # In[33]:
 
-
 #Calculate Centroid Mean
 centroids = []
 features = set()
@@ -289,7 +327,6 @@ np.savetxt(centroid_path+"features.csv", np.asarray(list(features)), delimiter="
 
 
 # In[44]:
-
 
 #Actual Clustering
 
@@ -337,69 +374,60 @@ for filename in os.listdir(sample_path):
     sample_count += 1
 
 
-# In[45]:
+# In[95]:
 
-
+#For a given IP address find how many time a given cluster it was assigned to.
 from itertools import groupby
-ip_dict = dict()
-
-for filename in os.listdir(cluster_path):
-    with open(cluster_path+filename, newline='') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            if row['ip'] in ip_dict:
-                #print(row['ip'],ip_dict[row['ip']])
-                ip_dict[row['ip']] = ip_dict[row['ip']] + [row['cluster']]
-            else:
-                ip_dict[row['ip']] = [row['cluster']]
-
-
-# In[46]:
-
-
-ip_cluster_dict = dict()
-#Find count of clusters 
-for key, value in ip_dict.items():
-    ip_cluster_dict[key] = {k: len(list(group)) for k, group in groupby(value)}
+def get_IP_cluster_count_dict(cluster_path):    
+    ip_dict = dict()
+    filenames = glob.glob(os.path.join(cluster_path,'*'))
+    for filename in filenames:
+        with open(filename, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if row['ip'] in ip_dict:
+                    #print(row['ip'],ip_dict[row['ip']])
+                    ip_dict[row['ip']] = ip_dict[row['ip']] + [row['cluster']]
+                else:
+                    ip_dict[row['ip']] = [row['cluster']]
+    #Find how many time IP was assigned to a given cluster
+    ip_cluster_dict = dict()
+    for key, value in ip_dict.items():
+        ip_cluster_dict[key] = {k: len(list(group)) for k, group in groupby(value)}
+    return ip_cluster_dict
 
 
-# In[47]:
+# In[96]:
 
+ip_cluster_dict = get_IP_cluster_count_dict(cluster_path)
+
+
+# In[97]:
 
 ip_cluster_dict
 
 
-# In[ ]:
-
-
-#Group IP by clusters and write to file
-for filename in os.listdir(cluster_path):
-    df = pd.read_csv(cluster_path+filename, index_col=0)
-    
-    if not os.path.exists(base_directory):
-                    os.makedirs(base_directory)
-
-
 # In[157]:
-
 
 df = pd.DataFrame([np.arange(5)]*3)
 
 
 # In[161]:
 
-
 df[0] = df[0]+1
 
 
 # In[162]:
-
 
 df
 
 
 # In[153]:
 
-
 [np.arange(10)]*3
+
+
+# In[ ]:
+
+
 

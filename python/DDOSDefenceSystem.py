@@ -5,7 +5,6 @@
 
 # In[1]:
 
-
 # Common Imports
 
 #Pandas for creating dataframes
@@ -20,12 +19,10 @@ import matplotlib.pyplot as plt
 
 # In[4]:
 
-
-get_ipython().run_line_magic('matplotlib', 'inline')
+get_ipython().magic('matplotlib inline')
 
 
 # In[3]:
-
 
 # Create capture object for live capture
 live_capture = pyshark.LiveCapture(interface='wlan1')
@@ -34,7 +31,6 @@ live_capture = pyshark.LiveCapture(interface='wlan1')
 # #### Live Cature (Packet count)
 
 # In[130]:
-
 
 d = dict()
 
@@ -57,7 +53,6 @@ print(d)
 
 # In[131]:
 
-
 # Capture packets for 5 second. Time frame is 5 second.
 live_capture.sniff(timeout=5)
 # print(capture)
@@ -79,12 +74,10 @@ for i in range(len(live_capture)):
 
 # In[132]:
 
-
 dst_stream
 
 
 # In[122]:
-
 
 type(live_capture)
 #capture[0]
@@ -94,13 +87,11 @@ type(live_capture)
 
 # In[2]:
 
-
 # Reading packets from pre-captured file
 file_cap = pyshark.FileCapture('captures/botnet-sample.pcap')
 
 
 # In[3]:
-
 
 # Convert each request to a data frame
 
@@ -127,7 +118,6 @@ for i in range(1000):
 
 # In[29]:
 
-
 # Create big table from all small dataframe which are per packet
 first = True
 for i in range(len(dfList)):
@@ -140,7 +130,6 @@ for i in range(len(dfList)):
 
 
 # In[35]:
-
 
 # Create big table from all small dataframe which are per packet
 first = True
@@ -155,12 +144,10 @@ for d in dfList:
 
 # In[37]:
 
-
 tdf.head()
 
 
 # In[58]:
-
 
 t = tdf
 i = 'ip.dst'
@@ -173,7 +160,6 @@ t[['_ws.expert', 'ip.dst']][t['_ws.expert'].notnull()]
 
 # In[44]:
 
-
 #Get all non null data
 # r = tdf
 # for c in list(r.columns):
@@ -182,8 +168,7 @@ t[['_ws.expert', 'ip.dst']][t['_ws.expert'].notnull()]
 
 # In[20]:
 
-
-get_ipython().run_line_magic('time', '')
+get_ipython().magic('time')
 dst_cap = dict()
 for packet in file_cap:  
         try:
@@ -199,12 +184,10 @@ for packet in file_cap:
 
 # In[57]:
 
-
 #dst_cap
 
 
 # In[113]:
-
 
 dst_cap[]
 
@@ -213,14 +196,12 @@ dst_cap[]
 
 # In[24]:
 
-
 # Create Dataframe from Dictionary
 df = pd.DataFrame.from_dict(dst_cap, orient="index")
 df.columns = ['Fequency']
 
 
 # In[65]:
-
 
 # Write newly created DataFrame to excel.
 from openpyxl import load_workbook
@@ -246,13 +227,11 @@ writer.save()
 
 # In[1]:
 
-
 # import subprocess
 # subprocess.run(["sudo", "airmon-ng"], stdout=subprocess.PIPE)
 
 
 # In[76]:
-
 
 # Load data into dataframe
 df = pd.read_excel(workbook_name, sheetname=1)
@@ -260,42 +239,35 @@ df = pd.read_excel(workbook_name, sheetname=1)
 
 # In[77]:
 
-
 df.head()
 
 
 # In[78]:
-
 
 df['prob'] = df / df.sum()
 
 
 # In[81]:
 
-
 df.sum()
 
 
 # In[80]:
-
 
 df.describe()
 
 
 # In[88]:
 
-
 df.head()
 
 
 # In[95]:
 
-
 df['count'].plot()
 
 
 # In[104]:
-
 
 from scipy.stats import entropy
 sp.stats.entropy(df['prob'])
@@ -303,36 +275,35 @@ sp.stats.entropy(df['prob'])
 
 # In[178]:
 
-
 df.sort_values('prob', ascending=False).head(10)
 
 
 # In[3]:
-
 
 df1 = pd.read_csv('captures/botnet-capture-20110810-neris.csv')
 
 
 # In[4]:
 
-
 df1.head()
 
 
 # In[162]:
-
 
 df1.Protocol.unique()
 
 
 # In[171]:
 
-
 df2 = df1.groupby(['Destination', 'Protocol'], sort=False).sum()
 
 
 # In[180]:
 
-
 df2.sort_values('No.', ascending=False)
+
+
+# In[ ]:
+
+
 

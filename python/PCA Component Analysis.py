@@ -3,7 +3,6 @@
 
 # In[ ]:
 
-
 # Data Normalization/Scalling
 from sklearn.preprocessing import StandardScaler
 X_std = StandardScaler().fit_transform(X)
@@ -35,7 +34,6 @@ plt.show()
 
 
 # In[ ]:
-
 
 #Cluster Beerstyle and Reviewrs
 from sklearn.cluster import KMeans

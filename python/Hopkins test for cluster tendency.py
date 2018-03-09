@@ -3,7 +3,6 @@
 
 # In[2]:
 
-
 #the closer the value to 1, the higher the likelihood of clusters.
 from sklearn.neighbors import NearestNeighbors
 from random import sample
@@ -34,4 +33,9 @@ def hopkins(X):
         H = 0
  
     return H
+
+
+# In[ ]:
+
+
 
