@@ -49,10 +49,10 @@ def PCA_component_analysis(X_std):
     plt.show()
 
 
-# In[5]:
+# In[3]:
 
 from sklearn.decomposition import PCA
-def plot_clusters(X, X_clusters, centroids, kmeans):
+def draw_clusters(X, X_clusters, centroids, kmeans):
     #Use PCA component analysis for visuals
     if X.shape[1] > 2:
         reduced_X = PCA(n_components=2).fit_transform(X)
@@ -89,9 +89,10 @@ def plot_clusters(X, X_clusters, centroids, kmeans):
     plt.show()
 
 
-# In[6]:
+# In[4]:
 
 from scipy.spatial.distance import euclidean
+#Calculate distance of data point from the its cluster center
 def k_mean_dist(data, clusters, cluster_centers):
     distances = []
     for i, d in enumerate(data):
@@ -102,23 +103,31 @@ def k_mean_dist(data, clusters, cluster_centers):
     return distances
 
 
-# In[7]:
+# In[55]:
 
 from sklearn.cluster import KMeans
-def determine_cluster_count(X_trans):
-    Nc = range(1, 10)
+#Find optimal number of clusters for k-means clustering using elbow method.
+def elbow_method(X_trans):
+    elbow_count = 0
+    range_val = 10
+    Nc = range(1, range_val)
     kmeans = [KMeans(n_clusters=i) for i in Nc]
-    kmeans
     score = [kmeans[i].fit(X_trans).score(X_trans) for i in range(len(kmeans))]
-    score
+    total_diff = abs(score[0] - score[len(score) -1])
+    for i in range(range_val - 2):
+        percent_diff = abs(score[i] - score[i+1])/total_diff
+        if percent_diff < 0.01:
+            elbow_count = i
+            break
     plt.plot(Nc,score)
     plt.xlabel('Number of Clusters')
     plt.ylabel('Score')
     plt.title('Elbow Curve')
     plt.show()
+    return elbow_count
 
 
-# In[8]:
+# In[6]:
 
 import glob
 #Merge sample files to create bigger sameple
@@ -141,7 +150,7 @@ def merge_sample_files(sample_folder, file_count):
             file_number +=1
 
 
-# In[13]:
+# In[7]:
 
 def get_cluster_feature_vector_dict(cluster_folder):
     cluster_dict = dict()
@@ -161,7 +170,7 @@ def get_cluster_feature_vector_dict(cluster_folder):
     return cluster_dict
 
 
-# In[72]:
+# In[8]:
 
 def plot_outlier_detecton(X_train, clf):
     
@@ -192,7 +201,7 @@ def plot_outlier_detecton(X_train, clf):
     plt.show()
 
 
-# In[73]:
+# In[9]:
 
 #SKlearn SVM
 from sklearn import svm
@@ -222,7 +231,7 @@ def one_class_svm_for_clusters(cluster_feature_dict):
     return svm_dict, scalar_dict
 
 
-# In[15]:
+# In[10]:
 
 #Base Folder sPaths
 base_path = os.path.join('converted','test2')
@@ -260,50 +269,143 @@ X_test_tran = scaler_dict[0].transform(X_test)
 svm_dict[0].predict(X_test_tran)
 
 
-# In[32]:
+# In[64]:
 
-first = True
-ip_dict = dict()
-sample_count = 1;
-columns = ['0','1','2','3']
-centroid_dfs = []
-first = True
+def create_feature_dataframe(sample_file, features):
+        df = pd.read_csv(sample_file, index_col=0)
+        #Filter Columns
+        df = df[['ip.dst', 'ip.proto', 'sniff_timestamp', 'sample']]
+        #Remove null destinations
+        df = df[df['ip.dst'].notnull()]
+        #Rename Columns
+        df.columns = ['ip', 'protocol', 'time_stamp', 'sample']
+        #Get count for each ip
+        df = df.groupby(['ip', 'protocol']).size().unstack().fillna(0).astype(int)
+        #Select TCP and UDP as only fetures (TCP:6, UDP:17)
+        df = df[features]
+        return df    
 
-for filename in os.listdir(sample_path):
-    tdf = pd.read_csv(sample_path+filename, index_col=0)
-    #Filter Columns
-    t = tdf[['ip.dst', 'ip.proto', 'sniff_timestamp', 'sample']]
-    #Remove null destinations
-    t = t[t['ip.dst'].notnull()]
-    #Rename Columns
-    t.columns = ['ip', 'proto', 'time_stamp', 'sample']
-    #Get count for each ip
-    df = t.groupby(['ip', 'proto']).size().unstack().fillna(0).astype(int)
-    #Select TCP and UDP as only fetures (TCP:6, UDP:17)
-    df = df[[6,17]]
-    #Get value matrix
-    X = df.values
+
+# In[62]:
+
+#Create feature dataframes from the sample files
+def get_all_dataframes(sample_path, features):
+    sample_df_list = []
+    for filename in os.listdir(sample_path):
+        sample_file = os.path.join(sample_path,filename)
+        df = create_feature_dataframe(sample_file, features)
+        sample_df_list.append(df)
+    return sample_df_list    
+
+
+# In[70]:
+
+def get_kmeans_centroid(feature_df, cluster_count):
+    """ X -> feature vector 
+        cluster_count -> Number of clusters to be used for k-means
+    """
+    df_centroid = {}
+    X = feature_df.values
     #Create scaling
     scaler = preprocessing.StandardScaler().fit(X)
     #Transform Traning data
     X_trans = scaler.transform(X)
-    #print(X_trans)
-    #Determine cluster counts using elbow method
-    #determine_cluster_count(X_trans)
-    #Define Number of Clusters
-    cluster_count = 3
     #Data Fitting using K-means
-    #if first:
     kmeans = KMeans(n_clusters=cluster_count)
     kmeans.fit(X_trans)
     #Insert cluster center to its corrosposnding dataframe each dataframe.
-    #Dataframe 0 contain all the clusters centers associated with 0th cluster 
+    #Dataframe 0 contain all the clusters centers associated with 0th cluster
+    first = True
     for i in range(kmeans.cluster_centers_.shape[0]):
-        s = pd.Series(kmeans.cluster_centers_[i], index=df.columns)
+        s = pd.Series(kmeans.cluster_centers_[i], index=feature_df.columns)
         if(first):
-            centroid_dfs.append(pd.DataFrame(columns=df.columns))
-        centroid_dfs[i] = centroid_dfs[i].append(s,ignore_index=True)         
-    first = False
+            df_centroid = pd.DataFrame(columns=feature_df.columns)
+            first = False
+        df_centroid = df_centroid.append(s,ignore_index=True)
+    return df_centroid
+
+
+# In[72]:
+
+first = True
+ip_dict = dict()
+sample_count = 1;
+centroid_dfs = []
+first = True
+cluster_count = 3
+features = [6,17] #(TCP:6, UDP:17)
+
+
+sample_df_list = get_all_dataframes(sample_path, features)
+
+
+# In[151]:
+
+df_concat = pd.DataFrame(columns=sample_df_list[0].columns)
+for df in sample_df_list:
+    df_centroid = get_kmeans_centroid(df, cluster_count)
+    df_concat = df_concat.append(df_centroid)
+
+
+# In[191]:
+
+clusters = df_concat.index.unique()
+centroids = []
+print(centroid)
+for c in clusters:
+    med = np.median(df_concat.loc[c], axis=0)
+    centroids.append(med)
+centroids
+
+
+# In[152]:
+
+df_concat.head()
+
+
+# In[168]:
+
+df = df_concat
+#df = df.sort_index()
+df = df.loc[0]
+df.head()
+
+
+# In[177]:
+
+r = plt.boxplot(df[6])
+
+
+# In[176]:
+
+np.median(df, axis=0)
+
+
+# In[175]:
+
+r["fliers"][0].get_data()
+
+
+# In[190]:
+
+# mean = df.mean()
+# print(mean)
+# std = df.std()
+# print(3*std)
+# print("****")
+# df[np.abs(df - mean) <= 3*std]
+# for index, row in df.iterrows():
+#     if (np.abs(row - mean) > 3*std).any():
+#         print("outlier")
+#         print(row)
+
+
+# In[119]:
+
+from scipy import stats
+a = [1,1,10,20,15,18]
+b = stats.trimboth(a, 0.1)
+b
 
 
 # In[33]:
@@ -361,7 +463,7 @@ for filename in os.listdir(sample_path):
     kmeans = KMeans(n_clusters=centroids.shape[0], init=centroids)
     clusters = kmeans.fit_predict(X_trans)
     #Plot clusters and data using PCA component analysis
-    #plot_clusters(X_trans, clusters, centroids, kmeans)
+    #draw_clusters(X_trans, clusters, centroids, kmeans)
     distances = k_mean_dist(X_trans, clusters, centroids)
     #Attaching label/cluster to IP
     cluster_df = pd.DataFrame({'cluster': kmeans.labels_})
@@ -402,9 +504,9 @@ def get_IP_cluster_count_dict(cluster_path):
 ip_cluster_dict = get_IP_cluster_count_dict(cluster_path)
 
 
-# In[97]:
+# In[77]:
 
-ip_cluster_dict
+#ip_cluster_dict
 
 
 # In[157]:
@@ -412,19 +514,49 @@ ip_cluster_dict
 df = pd.DataFrame([np.arange(5)]*3)
 
 
-# In[161]:
+# In[17]:
 
-df[0] = df[0]+1
-
-
-# In[162]:
-
-df
+vals = [-114.0, -9.3187241903579459, -4.3769387148407386, -1.8276073696951562,
+        -1.111777920816883, -0.73454965159430574, -0.50130043613458697, -0.32255237503735512, -0.23209280297904877]
 
 
-# In[153]:
+# In[42]:
 
-[np.arange(10)]*3
+for i in range(1,10):
+    print(i)
+
+
+# In[19]:
+
+len(vals)
+
+
+# In[24]:
+
+total_diff = abs(vals[0] - vals[8])
+
+
+# In[36]:
+
+elbow_val = []
+for i in range(8):
+    diff = abs(vals[i] - vals[i+1])/ total_diff
+    if diff < 0.01:
+        elbow_val.append(i)
+        print(diff)
+        break
+
+print(elbow_val)        
+
+
+# In[37]:
+
+elbow_val = [3,4,3,3,3,4,4,4,3,3,3,3,3,3,3]
+
+
+# In[39]:
+
+np.floor(np.mean(elbow_val))
 
 
 # In[ ]:
