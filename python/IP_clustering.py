@@ -231,18 +231,24 @@ def one_class_svm_for_clusters(cluster_feature_dict):
     return svm_dict, scalar_dict
 
 
-# In[10]:
+# In[199]:
 
-#Base Folder sPaths
-base_path = os.path.join('converted','test2')
-#Normal
+#Base Folder Paths
+base_folder = 'converted'
+test_folder = 'test2'
+base_path = os.path.join(base_folder, test_folder)
+#Normal Sample and cluster paths
 sample_path = os.path.join(base_path,'samples')
 cluster_path = os.path.join(base_path,'ip_cluster')
-#Attack
+os.makedirs(cluster_path, exist_ok=True)
+#Attack Sample and Cluster paths
 # sample_path = os.path.join(base_path,'attack_samples','1')
 # cluster_path = os.path.join(base_path,'attack_ip_cluster','1')
-
-centroid_path = os.path.join(base_path,'centroids')
+os.makedirs(cluster_path, exist_ok=True)
+#File to store centroids
+centroid_filename = "centroids.csv"
+#File to store feature list
+features_filename = "features.csv"
 
 
 # In[59]:
@@ -341,91 +347,37 @@ sample_df_list = get_all_dataframes(sample_path, features)
 
 # In[151]:
 
-df_concat = pd.DataFrame(columns=sample_df_list[0].columns)
-for df in sample_df_list:
-    df_centroid = get_kmeans_centroid(df, cluster_count)
-    df_concat = df_concat.append(df_centroid)
+def find_store_centroid_median(sample_frames, centroid_filename, features_filename):
+    features = sample_frames[0].columns
+    df_concat = pd.DataFrame(columns=features)
+    for df in sample_frames:
+        df_centroid = get_kmeans_centroid(df, cluster_count)
+        df_concat = df_concat.append(df_centroid)
+    #This gives list of centroid names
+    clusters = df_concat.index.unique()
+    centroids = []
+    #Find median for each centroid and store them in file
+    for c in clusters:
+        med = np.median(df_concat.loc[c], axis=0)
+        centroids.append(med) 
+    np.savetxt(os.path.join(base_path, centroid_filename), np.asarray(centroids), delimiter=",")
+    np.savetxt(os.path.join(base_path, features_filename), np.asarray(list(features)), delimiter=",")
+    return np.asarray(centroids)
 
 
-# In[191]:
+# In[200]:
 
-clusters = df_concat.index.unique()
-centroids = []
-print(centroid)
-for c in clusters:
-    med = np.median(df_concat.loc[c], axis=0)
-    centroids.append(med)
-centroids
+def read_centroid_features(centroid_filename, features_filename):
+    centroids = np.genfromtxt(os.path.join(base_path,centroid_filename), delimiter=',')
+    features = np.genfromtxt(os.path.join(base_path,features_filename), delimiter=',')
+    return centroids, features
 
 
-# In[152]:
+# In[ ]:
 
-df_concat.head()
-
-
-# In[168]:
-
-df = df_concat
-#df = df.sort_index()
-df = df.loc[0]
-df.head()
-
-
-# In[177]:
-
-r = plt.boxplot(df[6])
-
-
-# In[176]:
-
-np.median(df, axis=0)
-
-
-# In[175]:
-
-r["fliers"][0].get_data()
-
-
-# In[190]:
-
-# mean = df.mean()
-# print(mean)
-# std = df.std()
-# print(3*std)
-# print("****")
-# df[np.abs(df - mean) <= 3*std]
-# for index, row in df.iterrows():
-#     if (np.abs(row - mean) > 3*std).any():
-#         print("outlier")
-#         print(row)
-
-
-# In[119]:
-
-from scipy import stats
-a = [1,1,10,20,15,18]
-b = stats.trimboth(a, 0.1)
-b
-
-
-# In[33]:
-
-#Calculate Centroid Mean
-centroids = []
-features = set()
-for df in centroid_dfs:
-    centroid = []
-    for c in df.columns:
-        df = df[np.abs(df[c] - df[c].mean()) <= (3*df[c].std())]
-        #print(df[c])
-        centroid.append(df[c].mean())
-    centroids.append(centroid)
-    features |= set(df.columns)
-#Save centroid for future clusterinng
-if not os.path.exists(centroid_path):
-    os.makedirs(centroid_path)
-np.savetxt(centroid_path+"centroids.csv", np.asarray(centroids), delimiter=",")
-np.savetxt(centroid_path+"features.csv", np.asarray(list(features)), delimiter=",")
+centroids, features = read_centroid_features(centroid_filename, features_filename)
+def kmeans_clustering(centroid_filename, features_filename):
+    
 
 
 # In[44]:
@@ -433,8 +385,8 @@ np.savetxt(centroid_path+"features.csv", np.asarray(list(features)), delimiter="
 #Actual Clustering
 
 #Get centroid created in initial step
-centroids = np.genfromtxt(centroid_path+"centroids.csv", delimiter=',')
-features = np.genfromtxt(centroid_path+"features.csv", delimiter=',')
+centroids = np.genfromtxt(os.path.join(base_path,"centroids.csv"), delimiter=',')
+features = np.genfromtxt(os.path.join(base_path,"features.csv"), delimiter=',')
 sample_count = 1
 for filename in os.listdir(sample_path):
     tdf = pd.read_csv(sample_path+filename, index_col=0)
