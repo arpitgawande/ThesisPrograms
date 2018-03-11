@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import shutil
 
 
-# In[21]:
+# In[51]:
 
 #Base Folder Paths
 base_folder = 'converted'
@@ -47,7 +47,7 @@ if os.path.isdir(sample_path):
 features = [6,17] #(TCP:6, UDP:17)    
 
 
-# In[15]:
+# In[52]:
 
 import glob
 #Merge sample files to create bigger sameple
@@ -79,13 +79,18 @@ def merge_sample_files(sample_path, merge_count):
             file_number +=1
 
 
-# In[20]:
+# In[53]:
 
 # merge_count = 3
 # merge_sample_files(sample_path, merge_count)
 
 
-# In[23]:
+# In[ ]:
+
+sample_file
+
+
+# In[70]:
 
 def get_feature_dataframe(sample_file, features):
         df = pd.read_csv(sample_file, index_col=0)
@@ -104,21 +109,35 @@ def get_feature_dataframe(sample_file, features):
             non_columns = set(features) - set(df.columns)
             for c in non_columns:
                 df.insert(loc=features.index(c), column=c, value=0)
-        return df    
+        return df, sample_file
 
 
-# In[31]:
+# In[71]:
 
 filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
-df = get_feature_dataframe(filenames[0], features)
+df, sample_file = get_feature_dataframe(filenames[0], features)
 
 
-# In[33]:
+# In[72]:
 
-#df
+sample_file
 
 
-# In[ ]:
+# In[86]:
+
+#Create feature dataframes from the sample files
+def get_feature_vector_list(sample_path, features):
+    sample_df_list = []
+    sample_file_list = []
+    for filename in os.listdir(sample_path):
+        sample_file = os.path.join(sample_path,filename)
+        df, sample_file = get_feature_dataframe(sample_file, features)
+        sample_df_list.append(df)
+        sample_file_list.append(sample_file)
+    return sample_df_list, sample_file_list   
+
+
+# In[87]:
 
 from sklearn.cluster import KMeans
 #Find optimal number of clusters for k-means clustering using elbow method.
@@ -142,12 +161,33 @@ def elbow_method(X_trans):
     return opt_clust_count
 
 
-# In[ ]:
+# In[88]:
+
+df_list, sample_file_list = get_feature_vector_list(sample_path, features)
 
 
+# In[90]:
+
+#Apply elbow method on all the samples and get their mean
+def get_optimal_cluster_count(df_list):
+    elbow_vals = []
+    for df in df_list:
+        X = df.values
+        #Create scaling
+        scaler = preprocessing.StandardScaler().fit(X)
+        #Transform Traning data
+        X_trans = scaler.transform(X)
+        elbow = elbow_method(X_trans)
+        elbow_vals.append(elbow)
+    return int(np.floor(np.mean(elbow_vals)))
 
 
-# In[ ]:
+# In[91]:
+
+cluster_count = get_optimal_cluster_count(df_list)
+
+
+# In[92]:
 
 # Calculating Eigenvectors and eigenvalues of Cov matirx
 def PCA_component_analysis(X_std):
@@ -176,23 +216,12 @@ def PCA_component_analysis(X_std):
     plt.show()
 
 
-# In[ ]:
-
-#Create feature dataframes from the sample files
-def get_all_dataframes(sample_path, features):
-    sample_df_list = []
-    for filename in os.listdir(sample_path):
-        sample_file = os.path.join(sample_path,filename)
-        df = get_feature_dataframe(sample_file, features)
-        sample_df_list.append(df)
-    return sample_df_list    
-
-
-# In[ ]:
+# In[93]:
 
 def get_kmeans_centroid(feature_df, cluster_count):
-    """ X -> feature vector 
-        cluster_count -> Number of clusters to be used for k-means
+    """ 
+    X: feature vector 
+    cluster_count: Number of clusters to be used for k-means
     """
     df_centroid = {}
     X = feature_df.values
@@ -215,52 +244,54 @@ def get_kmeans_centroid(feature_df, cluster_count):
     return df_centroid
 
 
-# In[ ]:
+# In[94]:
 
-first = True
-ip_dict = dict()
-sample_count = 1;
-centroid_dfs = []
-first = True
-cluster_count = 3
-features = [6,17] #(TCP:6, UDP:17)
-
-
-sample_df_list = get_all_dataframes(sample_path, features)
-
-
-# In[ ]:
-
-def find_store_centroid_median(sample_frames, centroid_filename, features_filename):
-    features = sample_frames[0].columns
+#Find the median of all the centroid which will be better estimate of the centroid for all future k-means clustering
+def kmeans_centroids_median(sample_frames, features, cluster_count, centroid_filename, features_filename):
+    """
+    sample_frames: list of feature vector datafames
+    centroid_filename: File in which centroid has to be stored for future analyasis
+    features_filename: File in which feature list will be stored
+    """
     df_concat = pd.DataFrame(columns=features)
     for df in sample_frames:
+        #Run kmeans and get centroid
         df_centroid = get_kmeans_centroid(df, cluster_count)
+        #Create list of centroids
         df_concat = df_concat.append(df_centroid)
-    #This gives list of centroid names
-    clusters = df_concat.index.unique()
     centroids = []
     #Find median for each centroid and store them in file
-    for c in clusters:
-        med = np.median(df_concat.loc[c], axis=0)
-        centroids.append(med) 
+    for c in range(cluster_count):
+        med = np.median(df_concat.loc[c], axis=0) # e.g. df_concat.loc[0] is df of clister 0
+        centroids.append(med)
+    #Save centroids and features in files for future use
     np.savetxt(os.path.join(base_path, centroid_filename), np.asarray(centroids), delimiter=",")
     np.savetxt(os.path.join(base_path, features_filename), np.asarray(list(features)), delimiter=",")
-    return np.asarray(centroids)
 
 
-# In[ ]:
+# In[95]:
 
+cluster_count
+
+
+# In[96]:
+
+kmeans_centroids_median(df_list, features, cluster_count, centroid_filename, features_filename)
+
+
+# In[97]:
+
+#Get centroids and feature from the files
 def read_centroid_features(centroid_filename, features_filename):
     centroids = np.genfromtxt(os.path.join(base_path,centroid_filename), delimiter=',')
     features = np.genfromtxt(os.path.join(base_path,features_filename), delimiter=',')
     return centroids, features
 
 
-# In[2]:
+# In[108]:
 
 from sklearn.decomposition import PCA
-def draw_clusters(X, centroids):
+def draw_clusters(X, centroids, kmeans):
     #Use PCA component analysis for visuals
     if X.shape[1] > 2:
         reduced_X = PCA(n_components=2).fit_transform(X)
@@ -276,7 +307,6 @@ def draw_clusters(X, centroids):
     xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
 
     # Obtain labels for each point in mesh. Use last trained model.
-    kmeans = KMeans(init=centroids)
     Z = kmeans.predict(np.c_[xx.ravel(), yy.ravel()])
 
     # Put the result into a color plot
@@ -298,31 +328,7 @@ def draw_clusters(X, centroids):
     plt.show()
 
 
-# In[ ]:
-
-centroids, features = read_centroid_features(centroid_filename, features_filename)
-def kmeans_clustering(feature_df, centroids, file_name):
-    X = feature_df.values
-    #Create scaling
-    scaler = preprocessing.StandardScaler().fit(X)
-    #Transform Traning data
-    X_trans = scaler.transform(X)
-    #k means clustering using provided centroids 
-    kmeans = KMeans(init=centroids)
-    clusters = kmeans.fit_predict(X_trans)
-    #Plot clusters and data using PCA component analysis
-    #draw_clusters(X_trans, clusters, centroids, kmeans)
-    #Find distance of each point from the centroid
-    distances = k_mean_dist(X_trans, clusters, centroids)
-    #Getting the labels/clusters and distances of each IP from centroid
-    cluster_df = pd.DataFrame({'cluster': kmeans.labels_})
-    distance_df = pd.DataFrame({'distance': distances})
-    #Attaching label and distance to existing df and write new dataframe to file
-    df = pd.concat([feature_df.reset_index(), cluster_df, distance_df], axis=1).set_index('ip')
-    df.to_csv(os.path.join(cluster_path,str(file_name)))
-
-
-# In[3]:
+# In[99]:
 
 from scipy.spatial.distance import euclidean
 #Calculate distance of feature vector point from the its cluster center
@@ -334,6 +340,39 @@ def k_mean_dist(feature_vector, label, cluster_centers):
         #distance = np.linalg.norm(d - center)
         distances.append(distance)
     return distances
+
+
+# In[112]:
+
+centroids, features = read_centroid_features(centroid_filename, features_filename)
+def kmeans_clustering(feature_df, centroids):
+    X = feature_df.values
+    #Create scaling
+    scaler = preprocessing.StandardScaler().fit(X)
+    #Transform Traning data
+    X_trans = scaler.transform(X)
+    #k means clustering using provided centroids 
+    kmeans = KMeans(n_clusters=centroids.shape[0], init=centroids)
+    clusters = kmeans.fit_predict(X_trans)
+    #Plot clusters and data using PCA component analysis
+    draw_clusters(X_trans, centroids, kmeans)
+    #Find distance of each point from the centroid
+    distances = k_mean_dist(X_trans, clusters, centroids)
+    #Getting the labels/clusters and distances of each IP from centroid
+    cluster_df = pd.DataFrame({'cluster': kmeans.labels_})
+    distance_df = pd.DataFrame({'distance': distances})
+    #Attaching label and distance to existing df and write new dataframe to file
+    df = pd.concat([feature_df.reset_index(), cluster_df, distance_df], axis=1).set_index('ip')
+    return df
+
+
+# In[113]:
+
+#Cluster all the samples and store them
+for i, feature_df in enumerate(df_list):
+    clustered_df = kmeans_clustering(feature_df, centroids)
+    head, filename = os.path.split(sample_file_list[i])
+    clustered_df.to_csv(os.path.join(cluster_path,str(filename)))
 
 
 # In[ ]:
