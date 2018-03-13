@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[9]:
+# In[1]:
 
 get_ipython().magic('matplotlib inline')
 # Common Imports
@@ -21,23 +21,24 @@ import matplotlib.pyplot as plt
 import shutil
 
 
-# In[51]:
+# In[89]:
 
 #Base Folder Paths
-base_folder = 'converted'
-test_folder = 'test2'
-base_path = os.path.join(base_folder, test_folder)
+base_folder_name = 'converted'
+test_folder_name = 'test3'
+base_path = os.path.join(base_folder_name, test_folder_name)
 #Normal Sample and cluster paths
 sample_dir_name = 'samp'
 sample_path = os.path.join(base_path, sample_dir_name)
 #If sample folder exist
 if os.path.isdir(sample_path):
+    #Test and Train data Folders
+    train_path = os.path.join(base_path, sample_dir_name+'_train')
+    os.makedirs(train_path, exist_ok=True)
+    test_path = os.path.join(base_path, sample_dir_name+'_test')
+    os.makedirs(test_path, exist_ok=True)
     cluster_dir_name = sample_dir_name+'_cluster'
     cluster_path = os.path.join(base_path, cluster_dir_name)
-    os.makedirs(cluster_path, exist_ok=True)
-    #Attack Sample and Cluster paths
-    # sample_path = os.path.join(base_path,'attack_samples','1')
-    # cluster_path = os.path.join(base_path,'attack_ip_cluster','1')
     os.makedirs(cluster_path, exist_ok=True)
     #File to store centroids
     centroid_filename = 'centroids.csv'
@@ -47,7 +48,7 @@ if os.path.isdir(sample_path):
 features = [6,17] #(TCP:6, UDP:17)    
 
 
-# In[52]:
+# In[3]:
 
 import glob
 #Merge sample files to create bigger sameple
@@ -79,18 +80,13 @@ def merge_sample_files(sample_path, merge_count):
             file_number +=1
 
 
-# In[53]:
+# In[4]:
 
 # merge_count = 3
 # merge_sample_files(sample_path, merge_count)
 
 
-# In[ ]:
-
-sample_file
-
-
-# In[70]:
+# In[5]:
 
 def get_feature_dataframe(sample_file, features):
         df = pd.read_csv(sample_file, index_col=0)
@@ -102,6 +98,8 @@ def get_feature_dataframe(sample_file, features):
         df.columns = ['ip', 'protocol', 'time_stamp', 'sample']
         #Get count for each ip
         df = df.groupby(['ip', 'protocol']).size().unstack().fillna(0).astype(int)
+        #Drop row for given IP
+        df = filter_ip(df, '147.32.84.165')
         #Select TCP and UDP as only fetures (TCP:6, UDP:17)
         df = df[features]
         if(set(df.columns) != set(features)):
@@ -112,24 +110,39 @@ def get_feature_dataframe(sample_file, features):
         return df, sample_file
 
 
-# In[71]:
+# In[6]:
+
+def filter_ip(df, ip_addr):
+    with open(os.path.join(base_path,"filtered_ip_feture_vector"), "a+") as f:
+        df.loc[ip_addr].to_csv(f, header=False)
+    df = df.drop([ip_addr])
+    return df    
+
+
+# In[7]:
 
 filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
 df, sample_file = get_feature_dataframe(filenames[0], features)
 
 
-# In[72]:
+# In[8]:
+
+df.head()
+
+
+# In[9]:
 
 sample_file
 
 
-# In[86]:
+# In[10]:
 
 #Create feature dataframes from the sample files
 def get_feature_vector_list(sample_path, features):
     sample_df_list = []
     sample_file_list = []
-    for filename in os.listdir(sample_path):
+    filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
+    for filename in filenames:
         sample_file = os.path.join(sample_path,filename)
         df, sample_file = get_feature_dataframe(sample_file, features)
         sample_df_list.append(df)
@@ -137,7 +150,53 @@ def get_feature_vector_list(sample_path, features):
     return sample_df_list, sample_file_list   
 
 
-# In[87]:
+# In[107]:
+
+def create_train_test(sample_path, features):
+    count = 0; train_files = []; test_files = []
+    filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
+    file_count = len(filenames)
+    #Split train and test Train size 80% of data and 20% (1/5 th) is test
+    reminder = file_count%5
+    #Number of files to be combined to for one test data
+    merge_count = (file_count - reminder) / 5
+    for i, filename in enumerate(filenames, 1):
+        if count == 0:
+            df, sample_file = get_feature_dataframe(filename, features)
+            count += 1
+        else:
+            temp_df, sample_file = get_feature_dataframe(filename, features)
+            df = df.append(temp_df)
+            count += 1
+        if count == merge_count:
+            df = df.groupby(df.index).sum() #Combine data of same IP address
+            if i == file_count: #create test dataset at last
+                test_file = os.path.join(test_path,str(1))
+                df.to_csv(test_file)
+                test_files.append(test_file)
+            elif i <= 4*merge_count:
+                #Create training dataset
+                train_file = os.path.join(train_path,str(i/merge_count))
+                df.to_csv(train_file)
+                train_files.append(train_file)
+                df.drop(df.index, inplace=True)
+                count = 0
+            else: # New merge count for test set
+                merge_count = merge_count + reminder
+    return train_files, test_files
+
+
+# In[108]:
+
+train_files, test_files = create_train_test(sample_path, features)
+
+
+# In[109]:
+
+test_files
+
+
+# In[11]:
 
 from sklearn.cluster import KMeans
 #Find optimal number of clusters for k-means clustering using elbow method.
@@ -161,12 +220,12 @@ def elbow_method(X_trans):
     return opt_clust_count
 
 
-# In[88]:
+# In[12]:
 
 df_list, sample_file_list = get_feature_vector_list(sample_path, features)
 
 
-# In[90]:
+# In[13]:
 
 #Apply elbow method on all the samples and get their mean
 def get_optimal_cluster_count(df_list):
@@ -182,12 +241,17 @@ def get_optimal_cluster_count(df_list):
     return int(np.floor(np.mean(elbow_vals)))
 
 
-# In[91]:
+# In[14]:
 
 cluster_count = get_optimal_cluster_count(df_list)
 
 
-# In[92]:
+# In[15]:
+
+cluster_count
+
+
+# In[16]:
 
 # Calculating Eigenvectors and eigenvalues of Cov matirx
 def PCA_component_analysis(X_std):
@@ -216,7 +280,7 @@ def PCA_component_analysis(X_std):
     plt.show()
 
 
-# In[93]:
+# In[17]:
 
 def get_kmeans_centroid(feature_df, cluster_count):
     """ 
@@ -244,7 +308,7 @@ def get_kmeans_centroid(feature_df, cluster_count):
     return df_centroid
 
 
-# In[94]:
+# In[18]:
 
 #Find the median of all the centroid which will be better estimate of the centroid for all future k-means clustering
 def kmeans_centroids_median(sample_frames, features, cluster_count, centroid_filename, features_filename):
@@ -269,17 +333,17 @@ def kmeans_centroids_median(sample_frames, features, cluster_count, centroid_fil
     np.savetxt(os.path.join(base_path, features_filename), np.asarray(list(features)), delimiter=",")
 
 
-# In[95]:
+# In[19]:
 
 cluster_count
 
 
-# In[96]:
+# In[20]:
 
 kmeans_centroids_median(df_list, features, cluster_count, centroid_filename, features_filename)
 
 
-# In[97]:
+# In[21]:
 
 #Get centroids and feature from the files
 def read_centroid_features(centroid_filename, features_filename):
@@ -288,7 +352,7 @@ def read_centroid_features(centroid_filename, features_filename):
     return centroids, features
 
 
-# In[108]:
+# In[22]:
 
 from sklearn.decomposition import PCA
 def draw_clusters(X, centroids, kmeans):
@@ -328,7 +392,7 @@ def draw_clusters(X, centroids, kmeans):
     plt.show()
 
 
-# In[99]:
+# In[23]:
 
 from scipy.spatial.distance import euclidean
 #Calculate distance of feature vector point from the its cluster center
@@ -342,7 +406,7 @@ def k_mean_dist(feature_vector, label, cluster_centers):
     return distances
 
 
-# In[112]:
+# In[24]:
 
 centroids, features = read_centroid_features(centroid_filename, features_filename)
 def kmeans_clustering(feature_df, centroids):
@@ -366,7 +430,7 @@ def kmeans_clustering(feature_df, centroids):
     return df
 
 
-# In[113]:
+# In[25]:
 
 #Cluster all the samples and store them
 for i, feature_df in enumerate(df_list):
@@ -375,7 +439,7 @@ for i, feature_df in enumerate(df_list):
     clustered_df.to_csv(os.path.join(cluster_path,str(filename)))
 
 
-# In[ ]:
+# In[26]:
 
 #For a given IP address find how many time a given cluster it was assigned to.
 from itertools import groupby
@@ -398,19 +462,46 @@ def get_IP_cluster_count_dict(cluster_path):
     return ip_cluster_dict
 
 
-# In[ ]:
+# In[27]:
 
 ip_cluster_dict = get_IP_cluster_count_dict(cluster_path)
 
 
-# In[ ]:
+# In[28]:
 
-#ip_cluster_dict
+ip_cluster_dict
 
 
-# In[ ]:
+# In[48]:
 
-def get_cluster_feature_vector_dict(cluster_path):
+def tag_ip_with_cluster(ip_cluster_dict):
+    tag_filename = 'ip_cluster_tag'
+    tag_file = os.path.join(base_path,tag_filename)
+    df = pd.DataFrame(columns=['ip','cluster'])
+    for ip, clusters in ip_cluster_dict.items():
+        if len(clusters) == 1:
+            clust = list(clusters.keys())[0]
+        else:
+            mx = 0
+            clust = 0
+            for cluster, count in clusters.items():
+                if count > mx:
+                    mx = count
+                    clust = cluster
+        df = df.append(pd.Series([ip, clust], index=df.columns), ignore_index=True)
+    df.to_csv(tag_file)
+
+
+# In[49]:
+
+tag_ip_with_cluster(ip_cluster_dict)
+
+
+# In[51]:
+
+#Create feature vector corrosponding to each cluster. 
+#This feature vector would be used to define boundray using One Class SVM for the cluster.
+def get_clusters_feature_vectors(cluster_path):
     cluster_dict = dict()
     filenames = sorted(glob.glob(os.path.join(cluster_path,'*')),  key=os.path.getmtime)
     first = True
@@ -428,22 +519,17 @@ def get_cluster_feature_vector_dict(cluster_path):
     return cluster_dict
 
 
-# In[ ]:
+# In[55]:
 
-def plot_outlier_detecton(X_train, clf):
+def plot_outlier_detecton(X_train, clf, title):
     
     xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
     
     # plot the levels lines and the points
-    print(clf.name)
-    if clf.name == "lof":
-        # decision_function is private for LOF
-        Z = clf._decision_function(np.c_[xx.ravel(), yy.ravel()])
-    else:
-        Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
+    Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
     Z = Z.reshape(xx.shape)
-    print(Z.max(), Z.min())
-    plt.title("Novelty Detection")
+    
+    plt.title("Outlier Detection:" + str(title))
     plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
     a = plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
     #plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
@@ -459,56 +545,55 @@ def plot_outlier_detecton(X_train, clf):
     plt.show()
 
 
-# In[ ]:
+# In[56]:
 
 #SKlearn SVM
 from sklearn import svm
 from sklearn.neighbors import LocalOutlierFactor
-def one_class_svm_for_clusters(cluster_feature_dict):
-    svm_dict = dict()
-    scalar_dict = dict()
-    for key, value in cluster_feature_dict.items():
-        X_train = value
-        #Get scaler
-        scaler = preprocessing.StandardScaler().fit(X_train)
-        scalar_dict[key] = scaler 
-        #Transform Traning data
-        X_trans = scaler.transform(X_train)
-        # fit the model
-        clf = svm.OneClassSVM(nu=0.1, kernel="rbf", gamma=0.1)
-        clf.fit(X_trans)
-        clf.name = 'svm'
-        plot_outlier_detecton(X_trans, clf)
-        
-        clf = LocalOutlierFactor(contamination=0.01)
-        clf.fit(X_trans)
-        clf.name= 'lof'
-        plot_outlier_detecton(X_trans, clf)
-        #Store trained SVM for each IP
-        svm_dict[key] = clf
-    return svm_dict, scalar_dict
+def one_class_svm(feature_vector, cluster):
+    X_train = feature_vector
+    #Get scaler
+    scaler = preprocessing.StandardScaler().fit(X_train)
+    #Transform Traning data
+    X_trans = scaler.transform(X_train)
+    # fit the model
+    clf = svm.OneClassSVM(nu=0.01, kernel="rbf", gamma=0.1)
+    clf.fit(X_trans)
+    clf.name = 'svm'
+    #Plot the graph
+    title = ' Cluster '+ str(cluster)
+    plot_outlier_detecton(X_trans, clf, title)
+    return clf, scaler
 
 
-# In[ ]:
+# In[57]:
 
-#merge_sample_files(sample_path,3)
-d = get_cluster_feature_vector_dict(cluster_path)
-
-
-# In[ ]:
-
-#svm_dict, scaler_dict = one_class_svm_for_clusters(d)
+cluster_feature_dict = get_clusters_feature_vectors(cluster_path)
+clf_dict = dict()
+scaler_dict = dict()
+for cluster, df in cluster_feature_dict.items():
+    clf_dict[cluster], scaler_dict[cluster] = one_class_svm(df, cluster)
 
 
-# In[ ]:
+# In[58]:
 
-svm_dict
+cluster_feature_dict[0]
 
 
-# In[ ]:
+# In[112]:
 
 #Predict for the give destination if it is normal or not
-X_test = [[0,120]]
+X_test = [[658,0]]#[[1491,18]]
 X_test_tran = scaler_dict[0].transform(X_test)
-svm_dict[0].predict(X_test_tran)
+clf_dict[0].predict(X_test_tran)
+
+
+# In[113]:
+
+plot_outlier_detecton(X_test_tran, clf_dict[0])
+
+
+# In[ ]:
+
+
 
