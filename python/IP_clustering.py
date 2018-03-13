@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[311]:
 
 get_ipython().magic('matplotlib inline')
 # Common Imports
@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import shutil
 
 
-# In[89]:
+# In[312]:
 
 #Base Folder Paths
 base_folder_name = 'converted'
@@ -37,56 +37,16 @@ if os.path.isdir(sample_path):
     os.makedirs(train_path, exist_ok=True)
     test_path = os.path.join(base_path, sample_dir_name+'_test')
     os.makedirs(test_path, exist_ok=True)
-    cluster_dir_name = sample_dir_name+'_cluster'
-    cluster_path = os.path.join(base_path, cluster_dir_name)
-    os.makedirs(cluster_path, exist_ok=True)
-    #File to store centroids
-    centroid_filename = 'centroids.csv'
-    #File to store feature list
-    features_filename = 'features.csv'
+    
+    train_cluster_path = os.path.join(train_path, 'cluster')
+    test_cluster_path = os.path.join(test_path, 'cluster')
+    os.makedirs(train_cluster_path, exist_ok=True)
+    os.makedirs(test_cluster_path, exist_ok=True)
 #Defining features
 features = [6,17] #(TCP:6, UDP:17)    
 
 
-# In[3]:
-
-import glob
-#Merge sample files to create bigger sameple
-def merge_sample_files(sample_path, merge_count):
-    #Make copy
-    head, tail = os.path.split(sample_path)
-    copy_path = os.path.join(head,tail+'_copy')
-    if os.path.isdir(copy_path):
-        shutil.rmtree(copy_path)
-    shutil.copytree(sample_path, copy_path)
-    #delete all the file and recreate folder
-    shutil.rmtree(sample_path)
-    os.makedirs(sample_path, exist_ok=True)
-    file_number = 1
-    count = 0
-    filenames = sorted(glob.glob(os.path.join(copy_path,'*')),  key=os.path.getmtime)
-    for filename in filenames:
-        if count == 0:
-            df = pd.read_csv(filename, index_col=0)
-            count += 1
-        else:
-            temp_df = pd.read_csv(filename, index_col=0)
-            df = df.append(temp_df)
-            count += 1
-        if count == merge_count:
-            df.to_csv(os.path.join(sample_path,str(file_number)))
-            df = df.drop(df.index, inplace=True)
-            count = 0
-            file_number +=1
-
-
-# In[4]:
-
-# merge_count = 3
-# merge_sample_files(sample_path, merge_count)
-
-
-# In[5]:
+# In[313]:
 
 def get_feature_dataframe(sample_file, features):
         df = pd.read_csv(sample_file, index_col=0)
@@ -110,7 +70,7 @@ def get_feature_dataframe(sample_file, features):
         return df, sample_file
 
 
-# In[6]:
+# In[314]:
 
 def filter_ip(df, ip_addr):
     with open(os.path.join(base_path,"filtered_ip_feture_vector"), "a+") as f:
@@ -119,48 +79,32 @@ def filter_ip(df, ip_addr):
     return df    
 
 
-# In[7]:
+# In[315]:
 
 filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
 df, sample_file = get_feature_dataframe(filenames[0], features)
 
 
-# In[8]:
+# In[316]:
 
 df.head()
 
 
-# In[9]:
-
-sample_file
-
-
-# In[10]:
-
-#Create feature dataframes from the sample files
-def get_feature_vector_list(sample_path, features):
-    sample_df_list = []
-    sample_file_list = []
-    filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
-    for filename in filenames:
-        sample_file = os.path.join(sample_path,filename)
-        df, sample_file = get_feature_dataframe(sample_file, features)
-        sample_df_list.append(df)
-        sample_file_list.append(sample_file)
-    return sample_df_list, sample_file_list   
-
-
-# In[107]:
+# In[317]:
 
 def create_train_test(sample_path, features):
-    count = 0; train_files = []; test_files = []
+    count = 0; train_dfs = []; test_dfs = []
     filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
     file_count = len(filenames)
     #Split train and test Train size 80% of data and 20% (1/5 th) is test
     reminder = file_count%5
-    #Number of files to be combined to for one test data
-    merge_count = (file_count - reminder) / 5
-    for i, filename in enumerate(filenames, 1):
+    #Number of files to be combined to form one train/test data
+    merge_count = int((file_count - reminder) / 5)
+    train_files = filenames[:merge_count*4]
+    test_files = filenames[merge_count*4:]
+    #print(train_files)
+    #print(test_files)
+    for i, filename in enumerate(train_files, 1):
         if count == 0:
             df, sample_file = get_feature_dataframe(filename, features)
             count += 1
@@ -170,33 +114,49 @@ def create_train_test(sample_path, features):
             count += 1
         if count == merge_count:
             df = df.groupby(df.index).sum() #Combine data of same IP address
-            if i == file_count: #create test dataset at last
-                test_file = os.path.join(test_path,str(1))
-                df.to_csv(test_file)
-                test_files.append(test_file)
-            elif i <= 4*merge_count:
-                #Create training dataset
-                train_file = os.path.join(train_path,str(i/merge_count))
-                df.to_csv(train_file)
-                train_files.append(train_file)
-                df.drop(df.index, inplace=True)
-                count = 0
-            else: # New merge count for test set
-                merge_count = merge_count + reminder
-    return train_files, test_files
+            train_dfs.append(df)
+            count = 0
+    
+    for i, filename in enumerate(test_files, 1):
+        if count == 0:
+            df, sample_file = get_feature_dataframe(filename, features)
+            count += 1
+        else:
+            temp_df, sample_file = get_feature_dataframe(filename, features)
+            df = df.append(temp_df)
+            count += 1
+        if count == merge_count:
+            df = df.groupby(df.index).sum() #Combine data of same IP address
+            test_dfs.append(df)       
+    return train_dfs, test_dfs
 
 
-# In[108]:
+# In[318]:
 
-train_files, test_files = create_train_test(sample_path, features)
-
-
-# In[109]:
-
-test_files
+train_dfs, test_dfs = create_train_test(sample_path, features)
 
 
-# In[11]:
+# In[319]:
+
+#train_dfs[0]
+
+
+# In[320]:
+
+#Write train and test data to file
+train_files = []
+for i, df in enumerate(train_dfs, 1):
+    train_file = os.path.join(train_path,str(i))
+    df.to_csv(train_file)
+    train_files.append(train_file)
+test_files = []    
+for i, df in enumerate(test_dfs, 1):
+    test_file = os.path.join(test_path,str(i))
+    df.to_csv(test_file)
+    test_files.append(test_file)
+
+
+# In[321]:
 
 from sklearn.cluster import KMeans
 #Find optimal number of clusters for k-means clustering using elbow method.
@@ -220,12 +180,7 @@ def elbow_method(X_trans):
     return opt_clust_count
 
 
-# In[12]:
-
-df_list, sample_file_list = get_feature_vector_list(sample_path, features)
-
-
-# In[13]:
+# In[322]:
 
 #Apply elbow method on all the samples and get their mean
 def get_optimal_cluster_count(df_list):
@@ -241,17 +196,17 @@ def get_optimal_cluster_count(df_list):
     return int(np.floor(np.mean(elbow_vals)))
 
 
-# In[14]:
+# In[323]:
 
-cluster_count = get_optimal_cluster_count(df_list)
+cluster_count = get_optimal_cluster_count(train_dfs)
 
 
-# In[15]:
+# In[324]:
 
 cluster_count
 
 
-# In[16]:
+# In[325]:
 
 # Calculating Eigenvectors and eigenvalues of Cov matirx
 def PCA_component_analysis(X_std):
@@ -280,7 +235,7 @@ def PCA_component_analysis(X_std):
     plt.show()
 
 
-# In[17]:
+# In[326]:
 
 def get_kmeans_centroid(feature_df, cluster_count):
     """ 
@@ -308,10 +263,10 @@ def get_kmeans_centroid(feature_df, cluster_count):
     return df_centroid
 
 
-# In[18]:
+# In[327]:
 
 #Find the median of all the centroid which will be better estimate of the centroid for all future k-means clustering
-def kmeans_centroids_median(sample_frames, features, cluster_count, centroid_filename, features_filename):
+def kmeans_common_create_centroids(sample_frames, features, cluster_count, centroid_filename, features_filename):
     """
     sample_frames: list of feature vector datafames
     centroid_filename: File in which centroid has to be stored for future analyasis
@@ -331,19 +286,20 @@ def kmeans_centroids_median(sample_frames, features, cluster_count, centroid_fil
     #Save centroids and features in files for future use
     np.savetxt(os.path.join(base_path, centroid_filename), np.asarray(centroids), delimiter=",")
     np.savetxt(os.path.join(base_path, features_filename), np.asarray(list(features)), delimiter=",")
+    return centroids, features
 
 
-# In[19]:
+# In[328]:
 
-cluster_count
+#File to store centroids
+centroid_filename = 'centroids.csv'
+#File to store feature list
+features_filename = 'features.csv'
+#Call to find median of centroid
+kmeans_common_create_centroids(train_dfs, features, cluster_count, centroid_filename, features_filename)
 
 
-# In[20]:
-
-kmeans_centroids_median(df_list, features, cluster_count, centroid_filename, features_filename)
-
-
-# In[21]:
+# In[329]:
 
 #Get centroids and feature from the files
 def read_centroid_features(centroid_filename, features_filename):
@@ -352,7 +308,7 @@ def read_centroid_features(centroid_filename, features_filename):
     return centroids, features
 
 
-# In[22]:
+# In[330]:
 
 from sklearn.decomposition import PCA
 def draw_clusters(X, centroids, kmeans):
@@ -375,8 +331,6 @@ def draw_clusters(X, centroids, kmeans):
 
     # Put the result into a color plot
     Z = Z.reshape(xx.shape)
-    plt.figure(1)
-    plt.clf()
     plt.imshow(Z, interpolation='nearest',
                extent=(xx.min(), xx.max(), yy.min(), yy.max()),
                cmap=plt.cm.Paired,
@@ -384,7 +338,7 @@ def draw_clusters(X, centroids, kmeans):
     #Plot the data points (PCA reduced components)
     plt.plot(reduced_X[:,0],reduced_X[:,1],  'k.', markersize=3) 
     plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=169, linewidths=3, color='w', zorder=10)
-    plt.title('K-means clustering with (PCA-reduced data), Centroids are marked with white cross')
+    plt.title('K-means clustering with (PCA-reduced data)')
     plt.xlim(x_min, x_max)
     plt.ylim(y_min, y_max)
     plt.xticks(())
@@ -392,23 +346,8 @@ def draw_clusters(X, centroids, kmeans):
     plt.show()
 
 
-# In[23]:
+# In[331]:
 
-from scipy.spatial.distance import euclidean
-#Calculate distance of feature vector point from the its cluster center
-def k_mean_dist(feature_vector, label, cluster_centers):
-    distances = []
-    for i, d in enumerate(feature_vector):
-        center = cluster_centers[label[i]]
-        distance = euclidean(d,center)
-        #distance = np.linalg.norm(d - center)
-        distances.append(distance)
-    return distances
-
-
-# In[24]:
-
-centroids, features = read_centroid_features(centroid_filename, features_filename)
 def kmeans_clustering(feature_df, centroids):
     X = feature_df.values
     #Create scaling
@@ -420,26 +359,133 @@ def kmeans_clustering(feature_df, centroids):
     clusters = kmeans.fit_predict(X_trans)
     #Plot clusters and data using PCA component analysis
     draw_clusters(X_trans, centroids, kmeans)
-    #Find distance of each point from the centroid
-    distances = k_mean_dist(X_trans, clusters, centroids)
     #Getting the labels/clusters and distances of each IP from centroid
     cluster_df = pd.DataFrame({'cluster': kmeans.labels_})
-    distance_df = pd.DataFrame({'distance': distances})
     #Attaching label and distance to existing df and write new dataframe to file
-    df = pd.concat([feature_df.reset_index(), cluster_df, distance_df], axis=1).set_index('ip')
+    df = pd.concat([feature_df.reset_index(), cluster_df], axis=1).set_index('ip')
     return df
 
 
-# In[25]:
+# In[332]:
 
 #Cluster all the samples and store them
-for i, feature_df in enumerate(df_list):
-    clustered_df = kmeans_clustering(feature_df, centroids)
-    head, filename = os.path.split(sample_file_list[i])
-    clustered_df.to_csv(os.path.join(cluster_path,str(filename)))
+centroids, features = read_centroid_features(centroid_filename, features_filename)
+for i, train_df in enumerate(train_dfs):
+    clustered_df = kmeans_clustering(train_df, centroids)
+    clustered_df.to_csv(os.path.join(train_cluster_path,str(i+1)))
+for i, test_df in enumerate(test_dfs):
+    clustered_df = kmeans_clustering(test_df, centroids)
+    clustered_df.to_csv(os.path.join(test_cluster_path,str(i+1)))    
 
 
-# In[26]:
+# In[218]:
+
+print(centroids)
+
+
+# In[333]:
+
+def get_combined_df(cluster_path):
+    cluster_dict = dict()
+    filenames = sorted(glob.glob(os.path.join(cluster_path,'*')),  key=os.path.getmtime)
+    first = True
+    for filename in filenames:
+        if first:
+            df = pd.read_csv(filename, index_col=0)
+            first = False
+        else:
+            temp_df = pd.read_csv(filename, index_col=0)
+            df = df.append(temp_df) 
+    df = df.reset_index().set_index(['ip'])
+    return df
+
+
+# In[466]:
+
+dfc = get_combined_df(train_cluster_path)
+
+
+# In[467]:
+
+duplicates = dfc.loc[dfc.index.duplicated()]
+
+
+# In[468]:
+
+nonduplicates = dfc.loc[~dfc.index.duplicated()]
+
+
+# In[469]:
+
+duplicates.shape, nonduplicates.shape, dfc.shape
+
+
+# In[485]:
+
+nonduplicates.sum(axis=1).shape
+
+
+# In[470]:
+
+dfc.loc['109.200.240.44']
+
+
+# In[471]:
+
+df = dfc.loc['109.200.240.44']
+
+
+# In[473]:
+
+packet_count = duplicates[['6','17']].groupby('ip').mean().sum(axis=1).astype('int64')
+
+
+# In[474]:
+
+packet_count.head()
+
+
+# In[477]:
+
+cluster = duplicates[['cluster']].groupby('ip').median().astype('int64')
+
+
+# In[482]:
+
+cluster.shape, packet_count.shape
+
+
+# In[493]:
+
+combineddf = pd.concat([packet_count, cluster], axis=1)
+
+
+# In[ ]:
+
+
+
+
+# In[417]:
+
+dm['cluster'] = pd.Series([0,0,0,0,0,0,0,20], index=dm.index)
+
+
+# In[418]:
+
+dm
+
+
+# In[419]:
+
+dm[['cluster']].groupby('ip').median()
+
+
+# In[411]:
+
+int(1.5)
+
+
+# In[219]:
 
 #For a given IP address find how many time a given cluster it was assigned to.
 from itertools import groupby
@@ -462,21 +508,19 @@ def get_IP_cluster_count_dict(cluster_path):
     return ip_cluster_dict
 
 
-# In[27]:
+# In[220]:
 
 ip_cluster_dict = get_IP_cluster_count_dict(cluster_path)
 
 
-# In[28]:
+# In[221]:
 
-ip_cluster_dict
+#ip_cluster_dict
 
 
-# In[48]:
+# In[222]:
 
 def tag_ip_with_cluster(ip_cluster_dict):
-    tag_filename = 'ip_cluster_tag'
-    tag_file = os.path.join(base_path,tag_filename)
     df = pd.DataFrame(columns=['ip','cluster'])
     for ip, clusters in ip_cluster_dict.items():
         if len(clusters) == 1:
@@ -489,15 +533,24 @@ def tag_ip_with_cluster(ip_cluster_dict):
                     mx = count
                     clust = cluster
         df = df.append(pd.Series([ip, clust], index=df.columns), ignore_index=True)
-    df.to_csv(tag_file)
+    df = df.set_index('ip')
+    return df
 
 
-# In[49]:
+# In[223]:
 
-tag_ip_with_cluster(ip_cluster_dict)
+df = tag_ip_with_cluster(ip_cluster_dict)
+tag_filename = 'ip_cluster_tag_test'
+tag_file = os.path.join(base_path,tag_filename)
+df.to_csv(tag_file)
 
 
-# In[51]:
+# In[224]:
+
+df.head()
+
+
+# In[225]:
 
 #Create feature vector corrosponding to each cluster. 
 #This feature vector would be used to define boundray using One Class SVM for the cluster.
@@ -517,6 +570,74 @@ def get_clusters_feature_vectors(cluster_path):
     for c in clusters:
         cluster_dict[c] = df.loc[c].iloc[:,:-1].values
     return cluster_dict
+
+
+# In[236]:
+
+train_tag_filename = 'ip_cluster_tag_train'
+train_tag_file = os.path.join(base_path,train_tag_filename)
+train_df = df.from_csv(train_tag_file)
+test_tag_filename = 'ip_cluster_tag_test'
+test_tag_file = os.path.join(base_path,test_tag_filename)
+test_df = df.from_csv(test_tag_file)
+
+
+# In[257]:
+
+train_df.info()
+
+
+# In[238]:
+
+result = pd.merge(train_df, test_df, left_index=True, right_index=True, how='right')
+
+
+# In[268]:
+
+r = result.dropna()
+r = r.astype(int)
+
+
+# In[270]:
+
+r.head()
+
+
+# In[279]:
+
+#r.iloc[:,0].tolist()
+
+
+# In[280]:
+
+actual_clusters = r.iloc[:,0].tolist()
+predicted_clusters = r.iloc[:,1].tolist()
+
+
+# In[282]:
+
+import numpy as np
+from scipy.misc import comb
+
+def rand_index_score(actual_clusters, predicted_clusters):
+    tp_plus_fp = comb(np.bincount(actual_clusters), 2).sum()
+    tp_plus_fn = comb(np.bincount(predicted_clusters), 2).sum()
+    A = np.c_[(actual_clusters, predicted_clusters)]
+    tp = sum(comb(np.bincount(A[A[:, 0] == i, 1]), 2).sum()
+             for i in set(actual_clusters))
+    fp = tp_plus_fp - tp
+    fn = tp_plus_fn - tp
+    tn = comb(len(A), 2) - tp - fp - fn
+    ri =  (tp + tn) / (tp + fp + fn + tn)
+#     precision = tp / tp_plus_fp
+#     recall = tp / tp_plus_fn
+    print(ri, precision, recall)
+    return ri, precision, recall
+
+
+# In[283]:
+
+rand_index_score(actual_clusters, predicted_clusters)
 
 
 # In[55]:
