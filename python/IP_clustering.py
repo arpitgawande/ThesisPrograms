@@ -314,18 +314,18 @@ def read_centroid_features(centroid_filename, features_filename):
     return centroids, features        
 
 
-# In[50]:
+# In[79]:
 
 from sklearn.decomposition import PCA
-def draw_clusters(X, centroids, kmeans):
-    #Use PCA component analysis for visuals
+def draw_clusters(X, pre_centroids):
     if X.shape[1] > 2:
         reduced_X = PCA(n_components=2).fit_transform(X)
-        km = KMeans(n_clusters=len(np.unique(kmeans.labels_)))
+        km = KMeans(n_clusters=pre_centroids.shape[0])
         km.fit(reduced_X)
     else:
         reduced_X = X
-        km = kmeans
+        km = KMeans(n_clusters=pre_centroids.shape[0], init=pre_centroids)
+        km.fit(reduced_X)
    
     # Step size of the mesh. Decrease to increase the quality of the VQ.
     h = .01     # point in the mesh [x_min, x_max]x[y_min, y_max].
@@ -355,6 +355,67 @@ def draw_clusters(X, centroids, kmeans):
     plt.xticks(())
     plt.yticks(())
     plt.show()
+
+
+# In[91]:
+
+def draw_clusters1(X, pre_centroids, ax, title):
+    if X.shape[1] > 2:
+        reduced_X = PCA(n_components=2).fit_transform(X)
+        km = KMeans(n_clusters=pre_centroids.shape[0])
+        km.fit(reduced_X)
+    else:
+        reduced_X = X
+        km = KMeans(n_clusters=pre_centroids.shape[0], init=pre_centroids)
+        km.fit(reduced_X)
+   
+    # Step size of the mesh. Decrease to increase the quality of the VQ.
+    h = .01     # point in the mesh [x_min, x_max]x[y_min, y_max].
+
+    # Plot the decision boundary. For that, we will assign a color to each
+    x_min, x_max = reduced_X[:, 0].min() - 1, reduced_X[:, 0].max() + 1
+    y_min, y_max = reduced_X[:, 1].min() - 1, reduced_X[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+
+    # Obtain labels for each point in mesh. Use last trained model.
+    Z = km.predict(np.c_[xx.ravel(), yy.ravel()])
+
+    # Put the result into a color plot
+    Z = Z.reshape(xx.shape)
+    plt.imshow(Z, interpolation='nearest',
+               extent=(xx.min(), xx.max(), yy.min(), yy.max()),
+               cmap=plt.cm.Paired,
+               aspect='auto', origin='lower')   
+    #Plot the data points (PCA reduced components)
+    centroids = km.cluster_centers_
+    ax.plot(reduced_X[:,0],reduced_X[:,1],  'k.', markersize=3)
+    # Plot the centroids as a white X
+    ax.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=169, linewidths=3, color='w', zorder=10)
+    ax.set_title(title)
+    ax.set_xlim(x_min, x_max)
+    ax.set_ylim(y_min, y_max)
+    ax.set_xticks(())
+    ax.set_yticks(())
+
+
+# In[76]:
+
+centroids, features = read_centroid_features(centroid_filename, features_filename)
+
+
+# In[94]:
+
+fig = plt.figure(figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k')
+for i, df in enumerate(train_dfs[:4],1):
+    X = df.values
+    #Create scaling
+    X_trans = preprocessing.StandardScaler().fit_transform(X)
+    #Use PCA component analysis for visuals
+    ax = fig.add_subplot(2, 2, i)
+    plt.suptitle('K-means clustering with (PCA-reduced data)', fontsize=16)
+    title = 'Sample:'+str(i)
+    draw_clusters1(X_trans, centroids, ax, title)
+plt.savefig('kemans-clusterng.png')    
 
 
 # In[51]:
