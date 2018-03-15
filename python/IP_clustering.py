@@ -314,52 +314,9 @@ def read_centroid_features(centroid_filename, features_filename):
     return centroids, features        
 
 
-# In[79]:
+# In[97]:
 
-from sklearn.decomposition import PCA
-def draw_clusters(X, pre_centroids):
-    if X.shape[1] > 2:
-        reduced_X = PCA(n_components=2).fit_transform(X)
-        km = KMeans(n_clusters=pre_centroids.shape[0])
-        km.fit(reduced_X)
-    else:
-        reduced_X = X
-        km = KMeans(n_clusters=pre_centroids.shape[0], init=pre_centroids)
-        km.fit(reduced_X)
-   
-    # Step size of the mesh. Decrease to increase the quality of the VQ.
-    h = .01     # point in the mesh [x_min, x_max]x[y_min, y_max].
-
-    # Plot the decision boundary. For that, we will assign a color to each
-    x_min, x_max = reduced_X[:, 0].min() - 1, reduced_X[:, 0].max() + 1
-    y_min, y_max = reduced_X[:, 1].min() - 1, reduced_X[:, 1].max() + 1
-    xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
-
-    # Obtain labels for each point in mesh. Use last trained model.
-    Z = km.predict(np.c_[xx.ravel(), yy.ravel()])
-
-    # Put the result into a color plot
-    Z = Z.reshape(xx.shape)
-    plt.imshow(Z, interpolation='nearest',
-               extent=(xx.min(), xx.max(), yy.min(), yy.max()),
-               cmap=plt.cm.Paired,
-               aspect='auto', origin='lower')   
-    #Plot the data points (PCA reduced components)
-    plt.plot(reduced_X[:,0],reduced_X[:,1],  'k.', markersize=3)
-    # Plot the centroids as a white X
-    centroids = km.cluster_centers_
-    plt.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=169, linewidths=3, color='w', zorder=10)
-    plt.title('K-means clustering with (PCA-reduced data)')
-    plt.xlim(x_min, x_max)
-    plt.ylim(y_min, y_max)
-    plt.xticks(())
-    plt.yticks(())
-    plt.show()
-
-
-# In[91]:
-
-def draw_clusters1(X, pre_centroids, ax, title):
+def draw_clusters(X, pre_centroids, ax, title):
     if X.shape[1] > 2:
         reduced_X = PCA(n_components=2).fit_transform(X)
         km = KMeans(n_clusters=pre_centroids.shape[0])
@@ -403,10 +360,19 @@ def draw_clusters1(X, pre_centroids, ax, title):
 centroids, features = read_centroid_features(centroid_filename, features_filename)
 
 
+# ## Plot k-means clustering for samples
+
+# ### Print only 4 clustering plots
+
+# In[101]:
+
+to_print_df = train_dfs[:4]
+
+
 # In[94]:
 
 fig = plt.figure(figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k')
-for i, df in enumerate(train_dfs[:4],1):
+for i, df in enumerate(to_print_df, 1):
     X = df.values
     #Create scaling
     X_trans = preprocessing.StandardScaler().fit_transform(X)
@@ -418,7 +384,9 @@ for i, df in enumerate(train_dfs[:4],1):
 plt.savefig('kemans-clusterng.png')    
 
 
-# In[51]:
+# ## Do k-means clustering and save clustered output in the files
+
+# In[98]:
 
 def kmeans_clustering(feature_df, centroids):
     X = feature_df.values
@@ -429,8 +397,6 @@ def kmeans_clustering(feature_df, centroids):
     #k means clustering using provided centroids 
     kmeans = KMeans(n_clusters=centroids.shape[0], init=centroids)
     clusters = kmeans.fit_predict(X_trans)
-    #Plot clusters and data using PCA component analysis
-    draw_clusters(X_trans, centroids, kmeans)
     #Getting the labels/clusters and distances of each IP from centroid
     cluster_df = pd.DataFrame({'cluster': kmeans.labels_})
     #Attaching label and distance to existing df and write new dataframe to file
@@ -438,12 +404,7 @@ def kmeans_clustering(feature_df, centroids):
     return df
 
 
-# In[52]:
-
-test_dfs[0].head()
-
-
-# In[53]:
+# In[99]:
 
 #Cluster all the samples and store them
 centroids, features = read_centroid_features(centroid_filename, features_filename)
@@ -455,7 +416,7 @@ for i, test_df in enumerate(test_dfs):
     clustered_df.to_csv(os.path.join(cluster_test_path,str(i+1)))    
 
 
-# In[ ]:
+# In[100]:
 
 print(centroids)
 
@@ -574,6 +535,39 @@ def get_clusters_feature_vectors(cluster_path):
     for c in clusters:
         cluster_dict[c] = df.loc[c].values
     return cluster_dict
+
+
+# In[ ]:
+
+def plot_outlier_detecton(X, classifier, title):
+    if X.shape[1] > 2:
+        reduced_X = PCA(n_components=2).fit_transform(X)
+        clf = svm.OneClassSVM(nu=0.01, kernel="rbf", gamma=0.1)
+        clf.fit(reduced_X)
+    else:
+        reduced_X = X
+        clf = classifier
+    
+    xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
+    
+    # plot the levels lines and the points
+    Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+    
+    plt.title("Outlier Detection:" + str(title))
+    plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
+    a = plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
+    #plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
+    
+    s = 40
+    b1 = plt.scatter(reduced_X[:, 0], reduced_X[:, 1], c='white', s=s, edgecolors='k')
+    plt.axis('tight')
+    plt.xlim((-5, 5))
+    plt.ylim((-5, 5))
+    plt.legend([a.collections[0], b1],
+           ["learned frontier", "training observations"],
+           loc="upper left")
+    plt.show()
 
 
 # In[ ]:
