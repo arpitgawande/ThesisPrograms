@@ -20,6 +20,10 @@ import csv
 import matplotlib.pyplot as plt
 import shutil
 import glob
+#SKlearn SVM
+from sklearn import svm
+from sklearn.decomposition import PCA
+import math
 
 
 # In[2]:
@@ -314,7 +318,7 @@ def read_centroid_features(centroid_filename, features_filename):
     return centroids, features        
 
 
-# In[97]:
+# In[21]:
 
 def draw_clusters(X, pre_centroids, ax, title):
     if X.shape[1] > 2:
@@ -355,7 +359,7 @@ def draw_clusters(X, pre_centroids, ax, title):
     ax.set_yticks(())
 
 
-# In[76]:
+# In[22]:
 
 centroids, features = read_centroid_features(centroid_filename, features_filename)
 
@@ -364,14 +368,15 @@ centroids, features = read_centroid_features(centroid_filename, features_filenam
 
 # ### Print only 4 clustering plots
 
-# In[101]:
+# In[23]:
 
 to_print_df = train_dfs[:4]
 
 
-# In[94]:
+# In[24]:
 
 fig = plt.figure(figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k')
+row_count = math.ceil(len(to_print_df)/2)
 for i, df in enumerate(to_print_df, 1):
     X = df.values
     #Create scaling
@@ -380,13 +385,13 @@ for i, df in enumerate(to_print_df, 1):
     ax = fig.add_subplot(2, 2, i)
     plt.suptitle('K-means clustering with (PCA-reduced data)', fontsize=16)
     title = 'Sample:'+str(i)
-    draw_clusters1(X_trans, centroids, ax, title)
+    draw_clusters(X_trans, centroids, ax, title)
 plt.savefig('kemans-clusterng.png')    
 
 
 # ## Do k-means clustering and save clustered output in the files
 
-# In[98]:
+# In[25]:
 
 def kmeans_clustering(feature_df, centroids):
     X = feature_df.values
@@ -404,7 +409,7 @@ def kmeans_clustering(feature_df, centroids):
     return df
 
 
-# In[99]:
+# In[26]:
 
 #Cluster all the samples and store them
 centroids, features = read_centroid_features(centroid_filename, features_filename)
@@ -416,12 +421,12 @@ for i, test_df in enumerate(test_dfs):
     clustered_df.to_csv(os.path.join(cluster_test_path,str(i+1)))    
 
 
-# In[100]:
+# In[27]:
 
 print(centroids)
 
 
-# In[ ]:
+# In[28]:
 
 def ge_clustering_results(cluster_path):
     files = sorted(glob.glob(os.path.join(cluster_path,'*')),  key=os.path.getmtime)
@@ -449,18 +454,18 @@ def ge_clustering_results(cluster_path):
     return new_df
 
 
-# In[ ]:
+# In[29]:
 
 train_df = ge_clustering_results(cluster_train_path)
 test_df = ge_clustering_results(cluster_test_path)
 
 
-# In[ ]:
+# In[30]:
 
 train_df.shape, test_df.shape
 
 
-# In[ ]:
+# In[31]:
 
 #Save train result to file
 train_tag_filename = 'ip_cluster_tag_train'
@@ -472,7 +477,7 @@ tag_file = os.path.join(base_path,test_tag_filename)
 test_df.to_csv(tag_file)
 
 
-# In[ ]:
+# In[32]:
 
 train_tag_filename = 'ip_cluster_tag_train'
 train_tag_file = os.path.join(base_path,train_tag_filename)
@@ -482,7 +487,7 @@ test_tag_file = os.path.join(base_path,test_tag_filename)
 test_df = pd.read_csv(test_tag_file, index_col=0)
 
 
-# In[ ]:
+# In[33]:
 
 import numpy as np
 from scipy.misc import comb
@@ -506,14 +511,14 @@ def get_rand_index_score(train_df, test_df):
     return ri
 
 
-# In[ ]:
+# In[34]:
 
 get_rand_index_score(train_df, test_df)
 
 
 # ## Anamoly Detection Using One Class SVM
 
-# In[ ]:
+# In[35]:
 
 #Create feature vector corrosponding to each cluster. 
 #This feature vector would be used to define boundray using One Class SVM for the cluster.
@@ -537,7 +542,7 @@ def get_clusters_feature_vectors(cluster_path):
     return cluster_dict
 
 
-# In[ ]:
+# In[36]:
 
 def plot_outlier_detecton(X, classifier, title):
     if X.shape[1] > 2:
@@ -570,44 +575,66 @@ def plot_outlier_detecton(X, classifier, title):
     plt.show()
 
 
-# In[ ]:
+# In[61]:
 
-def plot_outlier_detecton(X, classifier, title):
+def plot_outlier_detecton1(X, ax, title):
     if X.shape[1] > 2:
         reduced_X = PCA(n_components=2).fit_transform(X)
-        clf = svm.OneClassSVM(nu=0.01, kernel="rbf", gamma=0.1)
-        clf.fit(reduced_X)
     else:
         reduced_X = X
-        clf = classifier
     
+    clf = svm.OneClassSVM(nu=0.01, kernel="rbf", gamma=0.1)
+    clf.fit(reduced_X)
     xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
-    
+
     # plot the levels lines and the points
     Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
     Z = Z.reshape(xx.shape)
-    
-    plt.title("Outlier Detection:" + str(title))
-    plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
-    a = plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
-    #plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
-    
+
+    ax.set_title(title)
+    ax.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
+    a = ax.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
+    ax.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
+
     s = 40
-    b1 = plt.scatter(reduced_X[:, 0], reduced_X[:, 1], c='white', s=s, edgecolors='k')
-    plt.axis('tight')
-    plt.xlim((-5, 5))
-    plt.ylim((-5, 5))
-    plt.legend([a.collections[0], b1],
+    b1 = ax.scatter(reduced_X[:, 0], reduced_X[:, 1], c='white', s=s, edgecolors='k')
+    #ax.set_axis('tight')
+    ax.set_xlim((-5, 5))
+    ax.set_ylim((-5, 5))
+    ax.legend([a.collections[0], b1],
            ["learned frontier", "training observations"],
            loc="upper left")
-    plt.show()
 
 
-# In[ ]:
+# In[38]:
 
-#SKlearn SVM
-from sklearn import svm
-from sklearn.neighbors import LocalOutlierFactor
+cluster_feature_dict = get_clusters_feature_vectors(cluster_train_path)
+
+
+# In[39]:
+
+#cluster_feature_dict[0]
+
+
+# In[63]:
+
+import math
+fig = plt.figure(figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k')
+row_count = math.ceil(len(cluster_feature_dict)/2)
+print(row_count)
+for i, (cluster, X) in enumerate(cluster_feature_dict.items(), 1):
+    #Create scaling
+    X_trans = preprocessing.StandardScaler().fit_transform(X)
+    ax = fig.add_subplot(row_count, 2, i)
+    plt.suptitle('One Class SVM (PCA-reduced data)', fontsize=16)
+    title = 'Cluster:'+str(cluster)
+    if (X_trans.shape[0] >= X_trans.shape[1]):
+        plot_outlier_detecton1(X_trans, ax, title)
+plt.savefig('oneclassSVM.png')
+
+
+# In[41]:
+
 def one_class_svm(feature_vector, cluster):
     X_train = feature_vector
     #Get scaler
@@ -624,22 +651,17 @@ def one_class_svm(feature_vector, cluster):
     return clf, scaler
 
 
-# In[ ]:
+# In[42]:
 
 cluster_train_path
 
 
-# In[ ]:
-
-cluster_feature_dict = get_clusters_feature_vectors(cluster_train_path)
-
-
-# In[ ]:
+# In[43]:
 
 #cluster_feature_dict[3]
 
 
-# In[ ]:
+# In[44]:
 
 clf_dict = dict()
 scaler_dict = dict()
@@ -647,7 +669,7 @@ for cluster, df in cluster_feature_dict.items():
     clf_dict[cluster], scaler_dict[cluster] = one_class_svm(df, cluster)
 
 
-# In[ ]:
+# In[45]:
 
 #Predict for the give destination if it is normal or not
 X_test = [[0,658,0]]#[[1491,18]]
@@ -655,14 +677,14 @@ X_test_tran = scaler_dict[0].transform(X_test)
 clf_dict[0].predict(X_test_tran)
 
 
-# In[ ]:
+# In[46]:
 
 #plot_outlier_detecton(X_test_tran, clf_dict[0], 'test')
 
 
 # ## Clustering the data captures during attack
 
-# In[ ]:
+# In[47]:
 
 attack_sample_dir_name = 'attack_samp'
 attack_sample_path = os.path.join(base_path, attack_sample_dir_name)
@@ -672,33 +694,33 @@ attack_cluster_path = os.path.join(attack_sample_train_path, 'cluster')
 os.makedirs(attack_cluster_path, exist_ok=True)
 
 
-# In[ ]:
+# In[48]:
 
 files = sorted(glob.glob(os.path.join(attack_sample_path,'*')),  key=os.path.getmtime)
 merge_count = np.genfromtxt(os.path.join(base_path,'merge_count'))
 
 
-# In[ ]:
+# In[49]:
 
 files
 
 
-# In[ ]:
+# In[50]:
 
 int(merge_count)
 
 
-# In[ ]:
+# In[51]:
 
 centroids, features = read_centroid_features(centroid_filename, features_filename)
 
 
-# In[ ]:
+# In[52]:
 
 attack_dfs = merge_files(files, merge_count, features)
 
 
-# In[ ]:
+# In[53]:
 
 #Cluster all the samples and store them
 centroids, features = read_centroid_features(centroid_filename, features_filename)
