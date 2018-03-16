@@ -1,30 +1,39 @@
 
 # coding: utf-8
 
-# In[1]:
+# ## Library imports
+
+# In[82]:
 
 get_ipython().magic('matplotlib inline')
-# Common Imports
+# package for scientific computing with Python
 import numpy as np
-#Pandas for creating dataframes
+# Data structure and data analysis tool
 import pandas as pd
-#Sklearn
+
+# sklearn is machine learning library for the Python
 from sklearn import preprocessing
-#K-means clustering algo
+# K-means clustering algo
 from sklearn.cluster import KMeans
+# Support vector machine library
+from sklearn import svm
+# Principal component analysis (PCA) module
+from sklearn.decomposition import PCA
+
 #OS moduled for file oprations
 import os
 #CSV module
 import csv
-#Plotting
+# Data plotting libraries
 import matplotlib.pyplot as plt
+# File operation libraries
 import shutil
 import glob
-#SKlearn SVM
-from sklearn import svm
-from sklearn.decomposition import PCA
+# Math functions
 import math
 
+
+# ## Declare and define file/folders for storing/retriving data for analyais
 
 # In[2]:
 
@@ -46,14 +55,30 @@ if os.path.isdir(sample_path):
     cluster_train_path = os.path.join(sample_train_path, 'cluster')
     os.makedirs(cluster_train_path, exist_ok=True)
     cluster_test_path = os.path.join(sample_test_path, 'cluster')
-    os.makedirs(cluster_test_path, exist_ok=True)
-#Defining features
-features = [1, 6, 17] #(ICMP:1, TCP:6, UDP:17)    
+    os.makedirs(cluster_test_path, exist_ok=True)  
+
+
+# ## Defining features we want to work with
+
+# In[ ]:
+
+features = [1, 6, 17] #(ICMP:1, TCP:6, UDP:17)  
 
 
 # In[3]:
 
 def filter_ip(df, ip_addr):
+    """
+    Take out ip adress that you dont want to see in trainng data
+    
+    Parameters
+    ----------
+    
+    df: panda dataframe
+        table from which processing has to be done.
+    ip_addr: string
+        IP address to be removed from table.
+    """
     with open(os.path.join(base_path,"filtered_ip_feture_vector"), "a+") as f:
         df.loc[ip_addr].to_csv(f, header=False)
     df = df.drop([ip_addr])
@@ -63,24 +88,36 @@ def filter_ip(df, ip_addr):
 # In[4]:
 
 def get_feature_dataframe(sample_file, features):
-        df = pd.read_csv(sample_file, index_col=0)
-        #Filter Columns
-        df = df[['ip.dst', 'ip.proto', 'sniff_timestamp', 'sample']]
-        #Remove null destinations
-        df = df[df['ip.dst'].notnull()]
-        #Rename Columns
-        df.columns = ['ip', 'protocol', 'time_stamp', 'sample']
-        #Get count for each ip
-        df = df.groupby(['ip', 'protocol']).size().unstack().fillna(0).astype(int)
-        #Drop row for given IP
-        #df = filter_ip(df, '147.32.84.165')        
-        if(set(df.columns) != set(features)):
-            non_columns = set(features) - set(df.columns)
-            for c in non_columns:
-                df.insert(loc=features.index(c), column=c, value=0)
-        #Select only required protocols which would be used as features
-        df = df[features]
-        return df
+    """
+    Create feature table from the sample file which has flow information
+    
+    Parameters
+    ----------
+    
+    sample_file: string
+        file(full path) containing IP layey information destination address, protocol, time stamp.
+        
+    features: list
+        list of feature we required for anlysis.
+    """
+    df = pd.read_csv(sample_file, index_col=0)
+    #Filter Columns
+    df = df[['ip.dst', 'ip.proto', 'sniff_timestamp', 'sample']]
+    #Remove null destinations
+    df = df[df['ip.dst'].notnull()]
+    #Rename Columns
+    df.columns = ['ip', 'protocol', 'time_stamp', 'sample']
+    #Get count for each ip
+    df = df.groupby(['ip', 'protocol']).size().unstack().fillna(0).astype(int)
+    #Drop row for given IP
+    #df = filter_ip(df, '147.32.84.165')        
+    if(set(df.columns) != set(features)):
+        non_columns = set(features) - set(df.columns)
+        for c in non_columns:
+            df.insert(loc=features.index(c), column=c, value=0)
+    #Select only required protocols which would be used as features
+    df = df[features]
+    return df
 
 
 # In[5]:
@@ -98,6 +135,21 @@ df.head()
 
 #Merge sample files to create bigger sameple
 def merge_files(files, merge_count, features):
+    """
+    Merge feature sample file to form bigger sample.
+    
+    Parameters
+    ----------
+    files: list
+        all the sample files,
+    
+    merge_count: int
+        number of files to be merged.
+    
+    features: list
+        list of features
+    
+    """
     if len(files) < merge_count:
         print('Too few file to merge')
         return
@@ -118,31 +170,29 @@ def merge_files(files, merge_count, features):
     return dfs
 
 
-# In[8]:
+# In[102]:
 
-def create_train_test(sample_path, features):
-    train_dfs = []; test_dfs = []
-    filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
-    file_count = len(filenames)
-    #Split train and test Train size 80% of data and 20% (1/5 th) is test
-    reminder = file_count%5
-    #Number of files to be combined to form one train/test data
-    merge_count = 1 #int((file_count - reminder) / 5)
+def create_train_test(sample_path, merge_count, features):
+    files = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
     
-#     train_files = filenames[:merge_count*4]
-#     test_files = filenames[merge_count*4:]
-
-    train_files = filenames[:file_count-1]
-    test_files = filenames[file_count-1:]
+    test_files = files[:merge_count]
+    train_files = files[merge_count:]
     
-    train_dfs = merge_files(train_files, merge_count, features)
     test_dfs = merge_files(test_files, merge_count, features)
-    return train_dfs, test_dfs, merge_count
+    train_dfs = merge_files(train_files, merge_count, features)
+    
+    return train_dfs, test_dfs
 
 
 # In[9]:
 
-train_dfs, test_dfs, merge_count = create_train_test(sample_path, features)
+merge_count = 1 #How many samples you want to merge to create bigger sample
+train_dfs, test_dfs = create_train_test(sample_path, merge_count, features)
+
+
+# In[85]:
+
+train_dfs[0].head()
 
 
 # In[10]:
@@ -386,7 +436,7 @@ for i, df in enumerate(to_print_df, 1):
     plt.suptitle('K-means clustering with (PCA-reduced data)', fontsize=16)
     title = 'Sample:'+str(i)
     draw_clusters(X_trans, centroids, ax, title)
-plt.savefig('kemans-clusterng.png')    
+plt.savefig('kemans-clustering.png')    
 
 
 # ## Do k-means clustering and save clustered output in the files
@@ -645,20 +695,12 @@ def one_class_svm(feature_vector, cluster):
     clf = svm.OneClassSVM(nu=0.01, kernel="rbf", gamma=0.1)
     clf.fit(X_trans)
     clf.name = 'svm'
-    #Plot the graph
-    title = ' Cluster '+ str(cluster)
-    plot_outlier_detecton(X_trans, clf, title)
     return clf, scaler
 
 
 # In[42]:
 
 cluster_train_path
-
-
-# In[43]:
-
-#cluster_feature_dict[3]
 
 
 # In[44]:
@@ -684,7 +726,7 @@ clf_dict[0].predict(X_test_tran)
 
 # ## Clustering the data captures during attack
 
-# In[47]:
+# In[67]:
 
 attack_sample_dir_name = 'attack_samp'
 attack_sample_path = os.path.join(base_path, attack_sample_dir_name)
@@ -694,33 +736,33 @@ attack_cluster_path = os.path.join(attack_sample_train_path, 'cluster')
 os.makedirs(attack_cluster_path, exist_ok=True)
 
 
-# In[48]:
+# In[68]:
 
 files = sorted(glob.glob(os.path.join(attack_sample_path,'*')),  key=os.path.getmtime)
 merge_count = np.genfromtxt(os.path.join(base_path,'merge_count'))
 
 
-# In[49]:
+# In[69]:
 
 files
 
 
-# In[50]:
+# In[70]:
 
 int(merge_count)
 
 
-# In[51]:
+# In[71]:
 
 centroids, features = read_centroid_features(centroid_filename, features_filename)
 
 
-# In[52]:
+# In[72]:
 
 attack_dfs = merge_files(files, merge_count, features)
 
 
-# In[53]:
+# In[73]:
 
 #Cluster all the samples and store them
 centroids, features = read_centroid_features(centroid_filename, features_filename)
@@ -729,35 +771,30 @@ for i, attack_df in enumerate(attack_dfs):
     clustered_df.to_csv(os.path.join(attack_cluster_path,str(i+1)))
 
 
-# In[ ]:
+# In[74]:
 
 files = sorted(glob.glob(os.path.join(attack_cluster_path,'*')),  key=os.path.getmtime)
 df = pd.read_csv(files[0], index_col=0)
 
 
-# In[ ]:
+# In[75]:
 
 df.shape
 
 
-# In[ ]:
+# In[76]:
 
 train_tag_filename = 'ip_cluster_tag_train'
 train_tag_file = os.path.join(base_path,train_tag_filename)
 train_df = pd.read_csv(train_tag_file, index_col=0)
 
 
-# In[ ]:
+# In[77]:
 
 train_df.head()
 
 
-# In[ ]:
-
-train_df.loc['192.168.0.7']
-
-
-# In[ ]:
+# In[78]:
 
 bad_ip_df = pd.DataFrame(columns=['ip', 'packet_count', 'cluster'])
 for ip, row in df.iterrows():
