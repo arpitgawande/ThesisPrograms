@@ -244,9 +244,9 @@ for i, df in enumerate(test_dfs, 1):
 #Find optimal number of clusters for k-means clustering using elbow method.
 def elbow_method(X_trans):
     """
-    For the k-means algorithm, elbow method check the percent of variance explaned 
+    For the k-means algorithm, elbow method check the percent of variance explained 
     as function of the number of clusters. Variance for each cluster number is calculated 
-    and the cluster number which produce less variance for the next cluster is selected 
+    and the cluster number which produce less variance for the next cluster number is selected 
     as best choice
     
     Parameters
@@ -724,42 +724,9 @@ def get_clusters_feature_vectors(cluster_path):
     return cluster_dict
 
 
-# In[36]:
+# In[130]:
 
-def plot_outlier_detecton(X, classifier, title):
-    if X.shape[1] > 2:
-        reduced_X = PCA(n_components=2).fit_transform(X)
-        clf = svm.OneClassSVM(nu=0.01, kernel="rbf", gamma=0.1)
-        clf.fit(reduced_X)
-    else:
-        reduced_X = X
-        clf = classifier
-    
-    xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
-    
-    # plot the levels lines and the points
-    Z = clf.decision_function(np.c_[xx.ravel(), yy.ravel()])
-    Z = Z.reshape(xx.shape)
-    
-    plt.title("Outlier Detection:" + str(title))
-    plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
-    a = plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
-    #plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
-    
-    s = 40
-    b1 = plt.scatter(reduced_X[:, 0], reduced_X[:, 1], c='white', s=s, edgecolors='k')
-    plt.axis('tight')
-    plt.xlim((-5, 5))
-    plt.ylim((-5, 5))
-    plt.legend([a.collections[0], b1],
-           ["learned frontier", "training observations"],
-           loc="upper left")
-    plt.show()
-
-
-# In[61]:
-
-def plot_outlier_detecton1(X, ax, title):
+def plot_outlier_detecton(X, ax, title):
     if X.shape[1] > 2:
         reduced_X = PCA(n_components=2).fit_transform(X)
     else:
@@ -811,7 +778,7 @@ for i, (cluster, X) in enumerate(cluster_feature_dict.items(), 1):
     plt.suptitle('One Class SVM (PCA-reduced data)', fontsize=16)
     title = 'Cluster:'+str(cluster)
     if (X_trans.shape[0] >= X_trans.shape[1]):
-        plot_outlier_detecton1(X_trans, ax, title)
+        plot_outlier_detecton(X_trans, ax, title)
 plt.savefig('oneclassSVM.png')
 
 
