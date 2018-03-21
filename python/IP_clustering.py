@@ -3,7 +3,7 @@
 
 # ### Library imports
 
-# In[82]:
+# In[1]:
 
 get_ipython().magic('matplotlib inline')
 # package for scientific computing with Python
@@ -33,7 +33,7 @@ import glob
 import math
 
 
-# ### Declare and define file/folders for storing/retriving data for analyais
+# ### Declare and define file/folders for storing/retrieving data for analysis
 
 # In[2]:
 
@@ -60,12 +60,12 @@ if os.path.isdir(sample_path):
 
 # ### Defining features we want to work with
 
-# In[ ]:
+# In[3]:
 
 features = [1, 6, 17] #(ICMP:1, TCP:6, UDP:17)  
 
 
-# In[3]:
+# In[4]:
 
 def filter_ip(df, ip_addr):
     """
@@ -87,7 +87,7 @@ def filter_ip(df, ip_addr):
 
 # ### Creating feature tables which would be input to k-means learning algorithms
 
-# In[4]:
+# In[5]:
 
 def get_feature_dataframe(sample_file, features):
     """
@@ -97,7 +97,8 @@ def get_feature_dataframe(sample_file, features):
     ----------
     
     sample_file: string
-        file(full path) containing IP layey information destination address, protocol, time stamp.
+        file(full path) containing IP layer information destination address, 
+        protocol, time stamp.
         
     features: list
         list of feature we required for anlysis.
@@ -122,23 +123,23 @@ def get_feature_dataframe(sample_file, features):
     return df
 
 
-# In[5]:
+# In[6]:
 
 filenames = sorted(glob.glob(os.path.join(sample_path,'*')),  key=os.path.getmtime)
 df = get_feature_dataframe(filenames[0], features)
 
 
-# In[6]:
+# In[7]:
 
 df.head()
 
 
-# In[7]:
+# In[8]:
 
 #Merge sample files to create bigger sameple
 def merge_files(files, merge_count, features):
     """
-    Merge feature sample file to form bigger sample.
+    Merge feature sample file to form bigger samples.
     
     Parameters
     ----------
@@ -172,7 +173,7 @@ def merge_files(files, merge_count, features):
     return dfs
 
 
-# In[110]:
+# In[9]:
 
 def create_train_test(sample_path, features, merge_count=1):
     """
@@ -182,7 +183,7 @@ def create_train_test(sample_path, features, merge_count=1):
     ----------
     
     sample_path: string
-        loation where all the packet sample files are kept
+        location where all the packet sample files are kept
     
     merge_count: int, default 1
         Number of files to be merged to create a feature table
@@ -198,29 +199,32 @@ def create_train_test(sample_path, features, merge_count=1):
     test_dfs = merge_files(test_files, merge_count, features)
     train_dfs = merge_files(train_files, merge_count, features)
     
-    return train_dfs, test_dfs
+    return train_dfs, test_dfs, merge_count
 
 
-# In[111]:
+# #### Create train and test data frames
 
-train_dfs, test_dfs = create_train_test(sample_path, features)
+# In[10]:
+
+train_dfs, test_dfs, merge_count = create_train_test(sample_path, features)
 
 
-# In[85]:
+# In[11]:
 
 train_dfs[0].head()
 
 
-# #### Save merge count which will be used for merging the file for tesitng on the real data
+# #### Save merge count which will be used for merging the files to form larger sample.
 
-# In[10]:
+# In[12]:
 
-np.savetxt(os.path.join(base_path, 'merge_count'), np.asarray(merge_count).reshape(1,), fmt='%d')
+np.savetxt(os.path.join(base_path, 'merge_count'), 
+           np.asarray(merge_count).reshape(1,), fmt='%d')
 
 
 # #### Store train and test tables on the file system
 
-# In[11]:
+# In[13]:
 
 #Write train and test data to file
 train_files = []
@@ -235,25 +239,26 @@ for i, df in enumerate(test_dfs, 1):
     test_files.append(test_file)
 
 
-# ## k-mean Clustering
+# ## k-means Clustering
 
 # ### Functions for finding optimal number of clusters for k-means clustering algorithm using elbow method.
 
-# In[12]:
+# In[14]:
 
 #Find optimal number of clusters for k-means clustering using elbow method.
-def elbow_method(X_trans):
+def elbow_method(X_trans, ax, title):
     """
-    For the k-means algorithm, elbow method check the percent of variance explained 
-    as function of the number of clusters. Variance for each cluster number is calculated 
-    and the cluster number which produce less variance for the next cluster number is selected 
-    as best choice
+    For the k-means algorithm, elbow method check the percent of 
+    variance explained as function of the number of clusters. 
+    Variance for each cluster number is calculated and the cluster 
+    number which produce less variance for the next cluster number 
+    is selected as best choice.
     
     Parameters
     ----------
     
     X_tran: vector
-        Standardize vector
+        Standardize vector.
     """
     elbow_count = 0
     range_val = 10
@@ -266,52 +271,67 @@ def elbow_method(X_trans):
         if percent_diff < 0.01:
             opt_clust_count = i
             break
-#     plt.plot(nc,score)
-#     plt.xlabel('Number of Clusters')
-#     plt.ylabel('Score')
-#     plt.title('Elbow Curve')
-#     plt.show()
+    ax.plot(nc,score)
+    ax.set_xlabel('Number of Clusters')
+    ax.set_ylabel('Score')
+    ax.set_title(title)
     return opt_clust_count
 
 
-# In[13]:
+# In[15]:
 
-def get_optimal_cluster_count(df_list):
+def get_optimal_cluster_count(df_list, count):
     """
-    Apply elbow method on all the sample vectors and get their mean as the best cluster number
-    for kmeans algorithm
+    Apply elbow method on all the sample vectors and get their mean as 
+    the best cluster number for kmeans algorithm.
     
     Parameters
     ----------
     
     df_list: list of dataframes
-        contain tables/dataframes for each sample data 
+        contain tables/dataframes for each sample data.
+        
+    count: int
+        Number of sample to loop t.
     """
     elbow_vals = []
-    for df in df_list:
+    row_count = math.ceil(count/2)
+    fig = plt.figure(figsize=(10, 4*row_count), dpi=80, facecolor='w', edgecolor='k')
+    fig.subplots_adjust(hspace=.5) #Adjust space between the subplot
+    for i, df in enumerate(df_list[:count], 1):
         X = df.values
         #Create scaling and transforme
         X_trans = preprocessing.StandardScaler().fit_transform(X)
-        elbow = elbow_method(X_trans)
+        #Create subplot
+        ax = fig.add_subplot(row_count, 2, i)
+        title = 'Sample:'+str(i)
+        fig.suptitle('Elbow Method', fontsize=16)
+        elbow = elbow_method(X_trans, ax, title)
         elbow_vals.append(elbow)
+    plt.savefig('elbow-method.png')
     return int(np.floor(np.mean(elbow_vals)))
 
 
 # #### Get the optimal cluster count
 
-# In[14]:
+# In[16]:
 
-cluster_count = get_optimal_cluster_count(train_dfs)
+sample_count = 4 #Number of samples to be used for elbow method
 
 
-# In[15]:
+# In[17]:
+
+cluster_count = get_optimal_cluster_count(train_dfs, sample_count)
+
+
+# In[18]:
 
 cluster_count
 
 
 # ### Functions for finding and storing the centroid which would be used for all k-means clustering.
 
-# In[17]:
+# In[19]:
 
 def get_kmeans_centroid(feature_df, cluster_count):
     """ 
@@ -323,7 +343,7 @@ def get_kmeans_centroid(feature_df, cluster_count):
     ----------
     
     feature_df: table/dataframe
-        vector on which the k-means algorithm is be applyed
+        vector on which the k-means algorithm is be applied
         
     cluster_count: int
         Number of clusters to be used for k-means clustering
@@ -332,12 +352,12 @@ def get_kmeans_centroid(feature_df, cluster_count):
     X = feature_df.values
     #Create scaling
     scaler = preprocessing.StandardScaler().fit(X)
-    #Transform Traning data
+    #Transform Training data
     X_trans = scaler.transform(X)
     #Data Fitting using K-means
     kmeans = KMeans(n_clusters=cluster_count)
     kmeans.fit(X_trans)
-    #Create clusetr dataframe for saving on file system
+    #Create cluster data-frame for saving on file system
     #Dataframe 0 contain all the clusters centers associated with 0th cluster
     first = True
     for i in range(kmeans.cluster_centers_.shape[0]):
@@ -349,13 +369,14 @@ def get_kmeans_centroid(feature_df, cluster_count):
     return df_centroid
 
 
-# In[107]:
+# In[20]:
 
 def get_kmeans_cluster_centroids(sample_frames, features, cluster_count):
     """
-    This function will first find all cluster centroids for all the training sample vectors and 
-    then calculate the median of each cluster over all the samples. This median
-    would be the best guess of the centroid for all the traing vectors and also would be use
+    This function will first find all cluster centroids for all the 
+    training sample vectors and then calculate the median of each 
+    cluster over all the samples. This median would be the best guess 
+    of the centroid for all the training vectors and also would be use
     for evaluation.
     
     Parameters
@@ -385,9 +406,9 @@ def get_kmeans_cluster_centroids(sample_frames, features, cluster_count):
     return centroids
 
 
-# #### Find the median of all the centroid which will be better estimate of the centroid for all future k-means clustering and store it on the file system also store the feature list
+# #### Find the median of all the centroid which will be better estimate of the centroid for all future k-means clustering and store it on the file system. Also store the feature list on file system:
 
-# In[108]:
+# In[21]:
 
 #Already define base directory path
 base_path = base_path
@@ -400,13 +421,15 @@ features_filename = 'features.csv'
 centroids = get_kmeans_cluster_centroids(train_dfs, features, cluster_count)
 
 #Save centroids and features in files for future use
-np.savetxt(os.path.join(base_path, centroid_filename), np.asarray(centroids), delimiter=",")
-np.savetxt(os.path.join(base_path, features_filename), np.asarray(list(features)), delimiter=",")
+np.savetxt(os.path.join(base_path, centroid_filename), 
+           np.asarray(centroids), delimiter=",")
+np.savetxt(os.path.join(base_path, features_filename), 
+           np.asarray(list(features)), delimiter=",")
 
 
 # ### After finding cluster count and the common centroids we will be doing kmeans clustering using previously calculated centroids
 
-# In[109]:
+# In[22]:
 
 def read_centroid_features(base_path, centroid_filename, features_filename):
     """
@@ -431,11 +454,24 @@ def read_centroid_features(base_path, centroid_filename, features_filename):
     return centroids, features        
 
 
-# In[21]:
+# In[23]:
+
+#Base directory path
+base_path = base_path #Already define
+#File to store centroids
+centroid_filename = centroid_filename #Already define
+#File to store feature list
+features_filename = features_filename #Already define
+#Get centroids and feature
+centroids, features = read_centroid_features(base_path, 
+                                             centroid_filename, features_filename)
+
+
+# In[24]:
 
 def draw_clusters(X, pre_centroids, ax, title):
     """
-    Draw the clusterd in 2D
+    Draw clusters in 2D
     
     Parameters
     ----------
@@ -484,7 +520,7 @@ def draw_clusters(X, pre_centroids, ax, title):
     centroids = km.cluster_centers_
     ax.scatter(centroids[:, 0], centroids[:, 1], marker='x', s=169, 
                linewidths=3, color='w', zorder=10)
-    #Set tile and boundries of the plot
+    #Set tile and boundaries of the plot
     ax.set_title(title)
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(y_min, y_max)
@@ -492,21 +528,9 @@ def draw_clusters(X, pre_centroids, ax, title):
     ax.set_yticks(())
 
 
-# In[112]:
-
-#Base directory path
-base_path = base_path #Already define
-#File to store centroids
-centroid_filename = centroid_filename #Already define
-#File to store feature list
-features_filename = features_filename #Already define
-#Get centroids and feature
-centroids, features = read_centroid_features(base_path, centroid_filename, features_filename)
-
-
 # ### Plot k-means clustering for samples
 
-# In[114]:
+# In[25]:
 
 def plot_kmeans_clusters(to_print_df):
     fig = plt.figure(figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k')
@@ -516,8 +540,8 @@ def plot_kmeans_clusters(to_print_df):
         #Create scaling
         X_trans = preprocessing.StandardScaler().fit_transform(X)
         #Create subplot
-        ax = fig.add_subplot(2, 2, i)
-        plt.suptitle('K-means clustering with (PCA-reduced data)', fontsize=16)
+        ax = fig.add_subplot(row_count, 2, i)
+        plt.suptitle('k-means++ clustering (with PCA-reduced data)', fontsize=16)
         title = 'Sample:'+str(i)
         draw_clusters(X_trans, centroids, ax, title)
     plt.savefig('kemans-clustering.png') 
@@ -525,16 +549,16 @@ def plot_kmeans_clusters(to_print_df):
 
 # #### Plot only few clusters as not all required.
 
-# In[115]:
+# In[26]:
 
 plot_count = 4
 to_print_df = train_dfs[:plot_count]
 plot_kmeans_clusters(to_print_df)
 
 
-# ### Do k-means clustering and save clustered output in the files
+# ### Do k-means++ clustering and save clustered output in the files
 
-# In[116]:
+# In[27]:
 
 def kmeans_clustering(feature_df, centroids):
     """
@@ -547,14 +571,14 @@ def kmeans_clustering(feature_df, centroids):
         is to clustered using k-means.
         
     centroids: vector
-        Vecotr containing centroid values. These centroids are
+        Vector containing centroid values. These centroids are
         used for clutering.
     
     """
     X = feature_df.values
     #Create scaling
     scaler = preprocessing.StandardScaler().fit(X)
-    #Transform Traning data
+    #Transform Training data
     X_trans = scaler.transform(X)
     #k means clustering using provided centroids 
     kmeans = KMeans(n_clusters=centroids.shape[0], init=centroids)
@@ -568,18 +592,17 @@ def kmeans_clustering(feature_df, centroids):
 
 # ### Apply Clustering on both training data and test data. Store clustered information on the file system
 
-# #### First retrieve the centroids and features
+# In[28]:
 
-# In[ ]:
+#First retrieve the centroids and features
+centroids, features = read_centroid_features(base_path, centroid_filename, features_filename)
 
-centroids, features = read_centroid_features(centroid_filename, features_filename)
 
+# #### Cluster all the samples and store them on file.
 
-# #### Cluster all the samples and store them
+# In[29]:
 
-# In[26]:
-
-centroids, features = read_centroid_features(centroid_filename, features_filename)
+centroids, features = read_centroid_features(base_path, centroid_filename, features_filename)
 for i, train_df in enumerate(train_dfs):
     clustered_df = kmeans_clustering(train_df, centroids)
     clustered_df.to_csv(os.path.join(cluster_train_path,str(i+1)))
@@ -588,23 +611,23 @@ for i, test_df in enumerate(test_dfs):
     clustered_df.to_csv(os.path.join(cluster_test_path,str(i+1)))    
 
 
-# In[27]:
+# In[30]:
 
 print(centroids)
 
 
 # ### Now combine clustering of all the train/test samples and find out the best cluster and average packet count for each IP 
 
-# In[120]:
+# In[31]:
 
 def get_best_cluster_sample_count(cluster_path):
     """
-    Get all the trained IP address and then cobine training data
-    from all the sample to make best judgement about the cluster
+    Get all the trained IP address and then combine training data
+    from all the sample to make best judgment about the cluster
     in which IP address should be placed into. It also gives the
-    average number of packets flowing during the analysis time 
-    which would help to determine if its truly attack or 
-    just a misjudgement.
+    average number of packets flowing during the analysis time
+    which would help to determine if its truly attack or
+    just a misjudgment.
     
     Parameters
     ----------
@@ -640,20 +663,20 @@ def get_best_cluster_sample_count(cluster_path):
 
 # #### Get tables containing best judged cluster and average packet count
 
-# In[121]:
+# In[32]:
 
 train_df = get_best_cluster_sample_count(cluster_train_path)
 test_df = get_best_cluster_sample_count(cluster_test_path)
 
 
-# In[122]:
+# In[33]:
 
 train_df.shape, test_df.shape
 
 
 # ### Function for finding RI index
 
-# In[127]:
+# In[34]:
 
 import numpy as np
 from scipy.misc import comb
@@ -679,14 +702,14 @@ def get_rand_index_score(train_df, test_df):
 
 # #### Find the RI index of the clustering using the train and test comparison
 
-# In[128]:
+# In[35]:
 
 get_rand_index_score(train_df, test_df)
 
 
 # #### Save the table obtained in previous step to file system. This table would be used to compare each flow with the past to identify if its threat or not.
 
-# In[31]:
+# In[36]:
 
 #Save train result to file
 train_tag_filename = 'ip_cluster_tag_train'
@@ -700,7 +723,7 @@ test_df.to_csv(tag_file)
 
 # ## Anamoly Detection Using One Class SVM
 
-# In[35]:
+# In[37]:
 
 #Create feature vector corrosponding to each cluster. 
 #This feature vector would be used to define boundray using One Class SVM for the cluster.
@@ -724,7 +747,7 @@ def get_clusters_feature_vectors(cluster_path):
     return cluster_dict
 
 
-# In[130]:
+# In[38]:
 
 def plot_outlier_detecton(X, ax, title):
     if X.shape[1] > 2:
@@ -755,34 +778,34 @@ def plot_outlier_detecton(X, ax, title):
            loc="upper left")
 
 
-# In[38]:
+# #### Get cluster data for training One Class SVM model
+
+# In[39]:
 
 cluster_feature_dict = get_clusters_feature_vectors(cluster_train_path)
 
 
-# In[39]:
+# In[40]:
 
-#cluster_feature_dict[0]
+#cluster_feature_dict[2]
 
 
-# In[63]:
+# In[41]:
 
-import math
 fig = plt.figure(figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k')
 row_count = math.ceil(len(cluster_feature_dict)/2)
-print(row_count)
 for i, (cluster, X) in enumerate(cluster_feature_dict.items(), 1):
     #Create scaling
     X_trans = preprocessing.StandardScaler().fit_transform(X)
     ax = fig.add_subplot(row_count, 2, i)
-    plt.suptitle('One Class SVM (PCA-reduced data)', fontsize=16)
+    plt.suptitle('One Class SVM (with PCA-reduced data)', fontsize=16)
     title = 'Cluster:'+str(cluster)
     if (X_trans.shape[0] >= X_trans.shape[1]):
         plot_outlier_detecton(X_trans, ax, title)
-plt.savefig('oneclassSVM.png')
+plt.savefig('one-class-SVM.png')
 
 
-# In[41]:
+# In[42]:
 
 def one_class_svm(feature_vector, cluster):
     X_train = feature_vector
@@ -797,7 +820,7 @@ def one_class_svm(feature_vector, cluster):
     return clf, scaler
 
 
-# In[42]:
+# In[43]:
 
 cluster_train_path
 
@@ -825,7 +848,17 @@ clf_dict[0].predict(X_test_tran)
 
 # ## Clustering the data captures during attack
 
-# In[67]:
+# In[55]:
+
+#Already define base directory path
+base_path = base_path
+#File to store centroids
+centroid_filename = 'centroids.csv'
+#File to store feature list
+features_filename = 'features.csv'
+
+
+# In[56]:
 
 attack_sample_dir_name = 'attack_samp'
 attack_sample_path = os.path.join(base_path, attack_sample_dir_name)
@@ -835,65 +868,71 @@ attack_cluster_path = os.path.join(attack_sample_train_path, 'cluster')
 os.makedirs(attack_cluster_path, exist_ok=True)
 
 
-# In[68]:
+# In[57]:
 
 files = sorted(glob.glob(os.path.join(attack_sample_path,'*')),  key=os.path.getmtime)
 merge_count = np.genfromtxt(os.path.join(base_path,'merge_count'))
 
 
-# In[69]:
+# In[58]:
 
 files
 
 
-# In[70]:
+# In[59]:
 
 int(merge_count)
 
 
-# In[71]:
+# In[60]:
 
-centroids, features = read_centroid_features(centroid_filename, features_filename)
+#Get centroids and feature list
+centroids, features = read_centroid_features(base_path, centroid_filename, features_filename)
 
 
-# In[72]:
+# In[61]:
 
 attack_dfs = merge_files(files, merge_count, features)
 
 
-# In[73]:
+# In[62]:
 
 #Cluster all the samples and store them
-centroids, features = read_centroid_features(centroid_filename, features_filename)
 for i, attack_df in enumerate(attack_dfs):
     clustered_df = kmeans_clustering(attack_df, centroids)
     clustered_df.to_csv(os.path.join(attack_cluster_path,str(i+1)))
 
 
-# In[74]:
+# In[63]:
 
+#Read clustered attack file
 files = sorted(glob.glob(os.path.join(attack_cluster_path,'*')),  key=os.path.getmtime)
 df = pd.read_csv(files[0], index_col=0)
 
 
-# In[75]:
+# In[64]:
 
 df.shape
 
 
-# In[76]:
+# In[65]:
+
+df.head()
+
+
+# In[66]:
 
 train_tag_filename = 'ip_cluster_tag_train'
 train_tag_file = os.path.join(base_path,train_tag_filename)
 train_df = pd.read_csv(train_tag_file, index_col=0)
 
 
-# In[77]:
+# In[67]:
 
 train_df.head()
 
 
-# In[78]:
+# In[68]:
 
 bad_ip_df = pd.DataFrame(columns=['ip', 'packet_count', 'cluster'])
 for ip, row in df.iterrows():
@@ -905,7 +944,7 @@ for ip, row in df.iterrows():
         train_cluster = train_df.loc[ip]['cluster']
         #Compare each ip data with the train cluster 
         if(cluster_value == train_cluster):
-            #SVM test: Check if its inside the boundry usinf one class svm
+            #SVM test: Check if its inside the boundary using one class svm
             X_test_tran = scaler_dict[cluster_value].transform([feature_row.values])
             prediction = clf_dict[cluster_value].predict(X_test_tran)
             if prediction == - 1:
@@ -921,5 +960,6 @@ print(bad_ip_df)
 
 # In[ ]:
 
-
+def ddos_attack_candidate(bad_ip_df, ):
+    
 
